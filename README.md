@@ -94,3 +94,4 @@ The frontend will compile and start on [http://localhost:5173](http://localhost:
 - **Typing Indicator**: Features a fluid bouncing dot animation to simulate live AI thinking.
 - **Auto-scroll**: The message thread automatically scrolls to the newest message upon delivery.
 - **Suggestion Chips**: When opening a new chat session, user-friendly suggestion cards let you quickly test common prompts.
+"# ai--chatbot" 
