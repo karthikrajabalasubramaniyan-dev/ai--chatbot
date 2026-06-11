@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0d1118">
+  <title>Aether Chat | Offline</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-app: #0d1118;
+      --bg-surface: rgba(255, 255, 255, 0.03);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --primary: #8b5cf6;
+      --primary-hover: #7c3aed;
+      --primary-glow: rgba(139, 92, 246, 0.25);
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-display: 'Outfit', system-ui, -apple-system, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 50%, var(--bg-app) 0%, #080b11 100%);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      overflow: hidden;
+    }
+
+    .offline-container {
+      width: 100%;
+      max-width: 440px;
+      text-align: center;
+      animation: fadeIn 0.4s ease-out;
+    }
+
+    .glass-card {
+      background: rgba(13, 17, 24, 0.7);
+      border: 1px solid var(--border-color);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 24px;
+      padding: 3rem 2rem;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+
+    .glow-overlay {
+      position: absolute;
+      width: 250px;
+      height: 250px;
+      background: radial-gradient(circle, rgba(139, 92, 246, 0.1) 0%, transparent 70%);
+      top: -50px;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .icon-wrapper {
+      width: 68px;
+      height: 68px;
+      border-radius: 20px;
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(245, 158, 11, 0.15));
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ef4444;
+      margin-bottom: 2rem;
+      box-shadow: 0 10px 25px rgba(239, 68, 68, 0.15);
+      position: relative;
+      z-index: 1;
+    }
+
+    .wifi-svg {
+      width: 32px;
+      height: 32px;
+      stroke-width: 1.8;
+      fill: none;
+      stroke: currentColor;
+    }
+
+    .offline-title {
+      font-family: var(--font-display);
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      background: linear-gradient(to right, var(--text-main), var(--text-muted));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      position: relative;
+      z-index: 1;
+    }
+
+    .offline-desc {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.6;
+      max-width: 300px;
+      margin-bottom: 2.5rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .retry-btn {
+      width: 100%;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 12px;
+      background: var(--primary);
+      color: #ffffff;
+      font-family: var(--font-sans);
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 14px var(--primary-glow);
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      z-index: 1;
+    }
+
+    .retry-btn:hover {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px var(--primary-glow);
+    }
+
+    .retry-btn:active {
+      transform: translateY(1px);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="offline-container">
+    <div class="glass-card">
+      <div class="glow-overlay"></div>
+      <div class="icon-wrapper">
+        <svg class="wifi-svg" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="1" y1="1" x2="23" y2="23"></line>
+          <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.5"></path>
+          <path d="M5 12.5a10.94 10.94 0 0 1 5.83-2.84"></path>
+          <path d="M12 18.5a3 3 0 0 0 2.12-.88"></path>
+          <path d="M9.88 17.62A3 3 0 0 0 12 18.5"></path>
+          <path d="M8.57 15.42A5.94 5.94 0 0 1 12 14.5a5.94 5.94 0 0 1 3.43.92"></path>
+          <path d="M21.3 8.11A15.96 15.96 0 0 1 23 8.5"></path>
+          <path d="M1 8.5a15.96 15.96 0 0 1 8.35-3.66"></path>
+        </svg>
+      </div>
+      <h1 class="offline-title">Connection Lost</h1>
+      <p class="offline-desc">You are currently offline. Aether Chat requires an active internet connection to communicate with the AI models.</p>
+      <button class="retry-btn" onclick="retryConnection()">Retry Connection</button>
+    </div>
+  </div>
+
+  <script>
+    function retryConnection() {
+      const btn = document.querySelector('.retry-btn');
+      btn.textContent = 'Checking...';
+      btn.style.opacity = '0.7';
+      btn.disabled = true;
+
+      setTimeout(() => {
+        if (navigator.onLine) {
+          window.location.href = '/';
+        } else {
+          btn.textContent = 'Retry Connection';
+          btn.style.opacity = '1';
+          btn.disabled = false;
+          // Apply a subtle error bounce
+          const card = document.querySelector('.glass-card');
+          card.style.transform = 'scale(0.98)';
+          setTimeout(() => card.style.transform = 'none', 150);
+        }
+      }, 800);
+    }
+
+    // Auto-detect when connection returns
+    window.addEventListener('online', () => {
+      window.location.href = '/';
+    });
+  </script>
+</body>
+</html>

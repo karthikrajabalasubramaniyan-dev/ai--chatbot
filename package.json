@@ -1,0 +1,48 @@
+{
+  "name": "aether-chat-desktop",
+  "version": "1.0.0",
+  "description": "Desktop version of the Aether Chat AI Assistant",
+  "main": "main.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev --prefix frontend\" \"cross-env NODE_ENV=development electron .\"",
+    "build:frontend": "npm run build --prefix frontend",
+    "dist": "npm run build:frontend && electron-packager . AetherChat --platform=win32 --arch=x64 --out=dist-electron --overwrite --ignore=\"(frontend/src|frontend/node_modules|frontend/public|dist-electron|\\.git)\""
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.1.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "electron": "^28.2.0",
+    "electron-packager": "^17.1.2"
+  },
+  "build": {
+    "appId": "com.aether.chat",
+    "productName": "AetherChat",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Aether Chat"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "backend/**/*",
+      "frontend/dist/**/*",
+      "package.json"
+    ],
+    "asar": true
+  }
+}

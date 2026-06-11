@@ -1,0 +1,24 @@
+{
+  "name": "Aether Chat | AI Assistant",
+  "short_name": "AetherChat",
+  "description": "A premium, glassmorphic AI chatbot assistant powered by React, Node.js and Gemini API.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d1118",
+  "theme_color": "#8b5cf6",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
