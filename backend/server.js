@@ -181,7 +181,7 @@ function getMockResponse(userMessage, model) {
 
 // POST endpoint for chat
 app.post("/api/chat", async (req, res) => {
-  const { message, history, model } = req.body;
+  const { message, history, model, attachment } = req.body;
 
   if (!message) {
     return res.status(400).json({ error: "Message is required" });
@@ -235,7 +235,20 @@ app.post("/api/chat", async (req, res) => {
         history: formattedHistory,
       });
 
-      const result = await chat.sendMessage(message);
+      let result;
+      if (attachment && attachment.data && attachment.mimeType) {
+        result = await chat.sendMessage([
+          {
+            inlineData: {
+              data: attachment.data,
+              mimeType: attachment.mimeType
+            }
+          },
+          message
+        ]);
+      } else {
+        result = await chat.sendMessage(message);
+      }
       const responseText = result.response.text();
       res.json({ response: responseText });
 
@@ -252,7 +265,18 @@ app.post("/api/chat", async (req, res) => {
           });
         });
       }
-      messages.push({ role: "user", content: message });
+      const userContent = [
+        { type: "text", text: message }
+      ];
+      if (attachment && attachment.data && attachment.mimeType && attachment.mimeType.startsWith("image/")) {
+        userContent.push({
+          type: "image_url",
+          image_url: {
+            url: `data:${attachment.mimeType};base64,${attachment.data}`
+          }
+        });
+      }
+      messages.push({ role: "user", content: userContent });
 
       const openAiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -286,7 +310,19 @@ app.post("/api/chat", async (req, res) => {
           });
         });
       }
-      messages.push({ role: "user", content: message });
+      const userContent = [];
+      if (attachment && attachment.data && attachment.mimeType && attachment.mimeType.startsWith("image/")) {
+        userContent.push({
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: attachment.mimeType,
+            data: attachment.data
+          }
+        });
+      }
+      userContent.push({ type: "text", text: message });
+      messages.push({ role: "user", content: userContent });
 
       const claudeResponse = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",

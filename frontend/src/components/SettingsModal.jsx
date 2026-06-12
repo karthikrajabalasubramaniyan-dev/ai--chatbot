@@ -513,6 +513,31 @@ export default function SettingsModal({ isOpen, onClose, settings, onSave }) {
           from { transform: scale(0.92); opacity: 0; }
           to { transform: scale(1); opacity: 1; }
         }
+
+        @media (max-width: 480px) {
+          .settings-modal-card {
+            width: 100%;
+            height: 100%;
+            max-height: 100%;
+            border-radius: 0;
+            display: flex;
+            flex-direction: column;
+            border: none;
+          }
+          .modal-form {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 1.25rem 1rem;
+            gap: 1rem;
+          }
+          .modal-header {
+            padding: 1rem;
+          }
+          .modal-footer {
+            padding: 1rem 0;
+            margin-top: auto;
+          }
+        }
       `}} />
     </div>
   );

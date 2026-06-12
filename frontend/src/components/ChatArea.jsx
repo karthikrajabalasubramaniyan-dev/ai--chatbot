@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Menu, Sparkles, Code, MessageSquare, Table, PanelLeft, Mic, MicOff, VolumeX, Globe, Settings } from "lucide-react";
+import { Send, Menu, Sparkles, Code, MessageSquare, Table, PanelLeft, Mic, MicOff, VolumeX, Globe, Settings, Paperclip, FileText, X } from "lucide-react";
 import MessageItem from "./MessageItem";
 import TypingIndicator from "./TypingIndicator";
 
@@ -40,6 +40,14 @@ export default function ChatArea({
 }) {
   const [input, setInput] = useState("");
   const [voiceStatus, setVoiceStatus] = useState("idle"); // "idle" | "listening" | "processing" | "error"
+  
+  // PDF Attachment States
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isParsing, setIsParsing] = useState(false);
+  const [extractedText, setExtractedText] = useState("");
+  const [base64Data, setBase64Data] = useState("");
+  
+  const fileInputRef = useRef(null);
   const [voiceLanguage, setVoiceLanguage] = useState("en-US");
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isVoiceInputSupported, setIsVoiceInputSupported] = useState(() => {
@@ -229,10 +237,89 @@ export default function ChatArea({
     }
   }, [input]);
 
+  const handleFileChange = async (file) => {
+    if (!file) return;
+
+    const isPdf = file.type === "application/pdf";
+    const isImage = file.type.startsWith("image/");
+
+    if (!isPdf && !isImage) {
+      alert("Only PDF documents and image files are supported for analysis.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    setSelectedFile(file);
+
+    if (isImage) {
+      setIsParsing(false); // No text extraction parsing needed for images
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64 = e.target.result.split(",")[1];
+        setBase64Data(base64);
+      };
+      reader.readAsDataURL(file);
+      setExtractedText("");
+    } else if (isPdf) {
+      setIsParsing(true);
+
+      // Read raw file as Base64 for Gemini direct API routing
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64 = e.target.result.split(",")[1];
+        setBase64Data(base64);
+      };
+      reader.readAsDataURL(file);
+
+      // Extract text client-side for OpenAI & Claude prompt injections
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdfjsLib = window["pdfjs-dist/build/pdf"];
+        if (!pdfjsLib) {
+          throw new Error("PDF.js library is not loaded from CDN.");
+        }
+
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+          "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        let text = "";
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          const strings = content.items.map((item) => item.str);
+          text += strings.join(" ") + "\n";
+        }
+        setExtractedText(text);
+      } catch (err) {
+        console.error("PDF text extraction failed:", err);
+      } finally {
+        setIsParsing(false);
+      }
+    }
+  };
+
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
+    setExtractedText("");
+    setBase64Data("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const handleSend = () => {
-    if (!input.trim() || isLoading) return;
-    onSendMessage(input.trim());
+    if (!input.trim() || isLoading || isParsing) return;
+    
+    const attachment = selectedFile ? {
+      data: base64Data,
+      mimeType: "application/pdf",
+      extractedText: extractedText,
+      fileName: selectedFile.name
+    } : null;
+
+    onSendMessage(input.trim(), attachment);
     setInput("");
+    handleRemoveFile();
   };
 
   const handleKeyDown = (e) => {
@@ -327,6 +414,40 @@ export default function ChatArea({
 
       {/* Input Form Panel */}
       <footer className="chat-input-container">
+        {selectedFile && (
+          <div className="attachment-preview glass-panel animate-fade-in">
+            <div className="attachment-info">
+              {selectedFile.type.startsWith("image/") ? (
+                <div className="image-preview-thumbnail-wrapper">
+                  <img
+                    src={base64Data ? `data:${selectedFile.type};base64,${base64Data}` : ""}
+                    alt="Preview"
+                    className="image-preview-thumbnail"
+                  />
+                </div>
+              ) : (
+                <FileText size={16} className="pdf-icon" />
+              )}
+              <span className="attachment-name">{selectedFile.name}</span>
+              {selectedFile.type.startsWith("image/") ? (
+                <span className="attachment-status ready">Image Ready</span>
+              ) : isParsing ? (
+                <span className="attachment-status">Indexing...</span>
+              ) : (
+                <span className="attachment-status ready">Parsed</span>
+              )}
+            </div>
+            <button
+              type="button"
+              className="remove-attachment-btn"
+              onClick={handleRemoveFile}
+              title="Remove attachment"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
         {isSpeaking && (
           <div className="stop-speaking-bar animate-fade-in">
             <button className="stop-speaking-btn" onClick={handleStopSpeaking}>
@@ -336,6 +457,27 @@ export default function ChatArea({
           </div>
         )}
         <div className="input-box-wrapper glass-panel">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={(e) => {
+              const file = e.target.files[0];
+              if (file) handleFileChange(file);
+            }}
+            accept="application/pdf,image/*"
+            style={{ display: "none" }}
+          />
+
+          <button
+            type="button"
+            className="paperclip-btn"
+            onClick={() => fileInputRef.current?.click()}
+            title="Upload PDF or image"
+            disabled={isLoading || isParsing || voiceStatus === "listening"}
+          >
+            <Paperclip size={18} />
+          </button>
+
           <textarea
             ref={textareaRef}
             rows={1}
@@ -343,14 +485,16 @@ export default function ChatArea({
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={
-              voiceStatus === "listening"
+              isParsing
+                ? "Parsing PDF document..."
+                : voiceStatus === "listening"
                 ? "Listening... Click microphone to finish speaking..."
                 : voiceStatus === "processing"
                 ? "Transcribing voice input..."
                 : "Message AI Chatbot..."
             }
             className={`chat-textarea ${voiceStatus === "listening" ? "textarea-listening" : ""} ${voiceStatus === "processing" ? "textarea-processing" : ""}`}
-            disabled={isLoading || voiceStatus === "processing"}
+            disabled={isLoading || voiceStatus === "processing" || isParsing}
           />
 
           {/* Language Toggle */}
@@ -387,7 +531,7 @@ export default function ChatArea({
           <button
             className={`send-btn ${input.trim() ? "active" : ""}`}
             onClick={handleSend}
-            disabled={!input.trim() || isLoading || voiceStatus === "processing"}
+            disabled={!input.trim() || isLoading || voiceStatus === "processing" || isParsing}
             title="Send message"
           >
             <Send size={18} />
@@ -543,6 +687,8 @@ export default function ChatArea({
           overflow-y: auto;
           padding: 1.5rem;
           position: relative;
+          scroll-behavior: smooth;
+          -webkit-overflow-scrolling: touch;
         }
         
         .message-list {
@@ -728,7 +874,37 @@ export default function ChatArea({
         
         @media (max-width: 768px) {
           .chat-header {
-            padding: 0 1rem;
+            height: 52px;
+            padding: 0 0.75rem;
+          }
+          .header-left {
+            gap: 8px;
+          }
+          .header-title-container {
+            gap: 6px;
+          }
+          .header-title {
+            font-size: 0.85rem;
+            max-width: 110px;
+          }
+          .header-badge {
+            font-size: 0.6rem;
+            padding: 1px 6px;
+          }
+          .model-dropdown-select {
+            padding: 5px 8px;
+            font-size: 0.75rem;
+            border-radius: 8px;
+          }
+          .settings-trigger-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+          }
+          .menu-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
           }
           .welcome-title {
             font-size: 1.6rem;
@@ -744,15 +920,38 @@ export default function ChatArea({
           .suggestion-card {
             padding: 1rem;
           }
+          .message-stream-container {
+            padding: 1rem 0.75rem;
+          }
           .chat-input-container {
-            padding: 0 1rem 1rem;
+            padding: 0 0.5rem 0.5rem;
+            gap: 6px;
           }
           .input-box-wrapper {
-            padding: 8px 10px;
-            border-radius: 16px;
+            padding: 6px 10px;
+            border-radius: 24px;
+            gap: 6px;
+            background-color: rgba(22, 28, 45, 0.7);
           }
           .chat-textarea {
-            font-size: 0.9rem;
+            font-size: 16px; /* Prevents auto-zoom on iOS */
+            padding: 6px 2px;
+          }
+          .send-btn, .mic-btn, .lang-toggle-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+          }
+          .lang-toggle-btn span {
+            display: none; /* Hide 'EN' / 'தமிழ்' text on mobile to save space */
+          }
+          .lang-toggle-btn {
+            padding: 0;
+            width: 34px;
+            height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
           }
         }
 
@@ -853,6 +1052,124 @@ export default function ChatArea({
         .voice-error-text {
           color: #f59e0b !important;
           font-weight: 500;
+        }
+
+        .paperclip-btn {
+          width: 36px;
+          height: 36px;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: var(--text-muted);
+          background-color: rgba(255, 255, 255, 0.02);
+          transition: all 0.2s ease;
+          flex-shrink: 0;
+        }
+        body.light-mode .paperclip-btn {
+          background-color: rgba(0, 0, 0, 0.02);
+        }
+        .paperclip-btn:hover:not(:disabled) {
+          color: var(--text-main);
+          background-color: rgba(255, 255, 255, 0.05);
+        }
+        body.light-mode .paperclip-btn:hover:not(:disabled) {
+          background-color: rgba(0, 0, 0, 0.05);
+        }
+        .paperclip-btn:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+        }
+
+        .attachment-preview {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 8px 14px;
+          border-radius: 14px;
+          background-color: rgba(14, 19, 31, 0.7);
+          border: 1px solid var(--border-color);
+          margin-bottom: 8px;
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+        }
+        body.light-mode .attachment-preview {
+          background-color: rgba(255, 255, 255, 0.8);
+        }
+
+        .attachment-info {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .pdf-icon {
+          color: #ef4444;
+          flex-shrink: 0;
+        }
+
+        .attachment-name {
+          font-size: 0.85rem;
+          font-weight: 600;
+          color: var(--text-main);
+          max-width: 300px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        @media (max-width: 480px) {
+          .attachment-name {
+            max-width: 160px;
+          }
+        }
+
+        .attachment-status {
+          font-size: 0.7rem;
+          font-weight: 600;
+          padding: 2px 6px;
+          border-radius: 6px;
+          background-color: rgba(245, 158, 11, 0.1);
+          color: #f59e0b;
+        }
+        .attachment-status.ready {
+          background-color: rgba(16, 185, 129, 0.1);
+          color: #10b981;
+        }
+
+        .remove-attachment-btn {
+          width: 24px;
+          height: 24px;
+          border-radius: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: var(--text-muted);
+          transition: all 0.2s;
+        }
+        .remove-attachment-btn:hover {
+          color: #ef4444;
+          background-color: rgba(239, 68, 68, 0.08);
+        }
+
+        .image-preview-thumbnail-wrapper {
+          width: 28px;
+          height: 28px;
+          border-radius: 6px;
+          overflow: hidden;
+          border: 1px solid var(--border-color);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          background-color: rgba(255, 255, 255, 0.05);
+        }
+        body.light-mode .image-preview-thumbnail-wrapper {
+          background-color: rgba(0, 0, 0, 0.05);
+        }
+        .image-preview-thumbnail {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
         }
       `}} />
     </div>

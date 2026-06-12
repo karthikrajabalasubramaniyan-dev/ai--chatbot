@@ -140,13 +140,20 @@ export default function App() {
   const activeConversation = conversations.find(c => c.id === currentConversationId) || null;
 
   // Handle sending a new message
-  const handleSendMessage = async (text) => {
+  const handleSendMessage = async (text, attachment) => {
     if (!text.trim()) return;
+
+    const isImage = attachment && attachment.mimeType?.startsWith("image/");
+    const userContent = attachment 
+      ? isImage
+        ? `🖼️ **Image**: ${attachment.fileName}\n\n${text}`
+        : `📎 **Document**: ${attachment.fileName}\n\n${text}`
+      : text;
 
     const userMessage = {
       id: Date.now().toString(),
       role: "user",
-      content: text,
+      content: userContent,
       timestamp: new Date().toISOString()
     };
 
@@ -197,15 +204,42 @@ export default function App() {
         content: m.content
       }));
 
+      // Construct prompt based on model capabilities
+      let promptMessage = text;
+      let payloadAttachment = null;
+
+      if (attachment) {
+        const isImage = attachment.mimeType?.startsWith("image/");
+        
+        if (isImage) {
+          // Send image payload to the backend for all models (multimodal vision)
+          payloadAttachment = {
+            data: attachment.data,
+            mimeType: attachment.mimeType
+          };
+        } else {
+          // It's a PDF: Send raw payload to Gemini, fallback context text to others
+          if (selectedModel === "gemini") {
+            payloadAttachment = {
+              data: attachment.data,
+              mimeType: attachment.mimeType
+            };
+          } else {
+            promptMessage = `[Document Context: ${attachment.fileName}]\n---\nDOCUMENT TEXT:\n${attachment.extractedText || "No text extracted."}\n---\nUser Question:\n${text}`;
+          }
+        }
+      }
+
       const response = await fetch(BACKEND_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          message: text,
+          message: promptMessage,
           history: apiHistory,
-          model: selectedModel
+          model: selectedModel,
+          attachment: payloadAttachment
         })
       });
 
