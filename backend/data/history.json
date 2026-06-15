@@ -1,5 +1,57 @@
 [
   {
+    "id": "1781332199720",
+    "title": "hi",
+    "messages": [
+      {
+        "id": "1781332199715",
+        "role": "user",
+        "content": "hi",
+        "timestamp": "2026-06-13T06:29:59.717Z"
+      },
+      {
+        "id": "1781332199996",
+        "role": "assistant",
+        "content": "⚠️ **Connection Error**\n\nFailed to connect to the backend server at `http://localhost:5000/api/chat`.\n\nPlease verify that:\n1. The backend server is running (`npm run dev` inside the `backend` folder).\n2. Your firewall or port configuration is correct.\n\n*Note: Since the backend is unreachable, live responses cannot be generated.*",
+        "timestamp": "2026-06-13T06:29:59.995Z"
+      }
+    ],
+    "createdAt": "2026-06-13T06:29:59.720Z",
+    "updatedAt": "2026-06-13T06:30:00.783Z"
+  },
+  {
+    "id": "1781327616621",
+    "title": "hi",
+    "messages": [
+      {
+        "id": "1781327616621",
+        "role": "user",
+        "content": "hi",
+        "timestamp": "2026-06-13T05:13:36.621Z"
+      },
+      {
+        "id": "1781327618670",
+        "role": "assistant",
+        "content": "Hi there! How can I help you today?",
+        "timestamp": "2026-06-13T05:13:38.669Z"
+      },
+      {
+        "id": "1781327787076",
+        "role": "user",
+        "content": "What is AI?",
+        "timestamp": "2026-06-13T05:16:27.076Z"
+      },
+      {
+        "id": "1781327800120",
+        "role": "assistant",
+        "content": "AI stands for **Artificial Intelligence**.\n\nAt its core, AI is a broad field of computer science that aims to create machines that can perform tasks that typically require human intelligence. This includes things like:\n\n*   **Learning:** Acquiring information and rules for using the information.\n*   **Reasoning:** Using rules to reach approximate or definite conclusions.\n*   **Problem-solving:** Finding solutions to complex problems.\n*   **Perception:** Understanding and interpreting visual or auditory input (like recognizing objects in an image or understanding spoken words).\n*   **Language understanding:** Comprehending and generating human language.\n*   **Decision-making:** Choosing the best course of action from various options.\n\n**How Does AI Work (in simple terms)?**\n\nModern AI often works by:\n\n1.  **Training on Data:** AI models are fed vast amounts of data (e.g., images, text, numbers).\n2.  **Pattern Recognition:** Through algorithms, the AI identifies patterns and relationships within that data.\n3.  **Learning:** It \"learns\" from these patterns without being explicitly programmed for every possible scenario.\n4.  **Making Predictions/Decisions:** Once trained, it can apply what it has learned to new, unseen data to make predictions, perform classifications, or take actions.\n\n**Key Subfields and Concepts within AI:**\n\n*   **Machine Learning (ML):** This is the most common approach to AI today. Instead of being explicitly programmed, machines \"learn\" from data. They use statistical techniques to enable computer systems to \"learn\" from data.\n    *   *Example:* A spam filter learns to identify spam by analyzing thousands of emails marked as spam vs. not spam.\n*   **Deep Learning (DL):** A subfield of Machine Learning that uses artificial neural networks with many layers (hence \"deep\"). These networks are inspired by the structure and function of the human brain.\n    *   *Example:* Deep learning powers facial recognition, self-driving cars, and highly accurate language translation.\n*   **Natural Language Processing (NLP):** Enables computers to understand, interpret, and generate human language.\n    *   *Example:* Voice assistants (Siri, Alexa), chatbots, sentiment analysis.\n*   **Computer Vision:** Enables computers to \"see\" and interpret visual information from images and videos.\n    *   *Example:* Object detection, medical image analysis, facial recognition.\n*   **Robotics:** While robotics is about building and operating robots, AI often provides the \"intelligence\" that allows robots to perceive, navigate, and make decisions in complex environments.\n\n**Types/Levels of AI:**\n\nIt's important to distinguish between what we have today and what is currently hypothetical:\n\n1.  **Narrow AI (Artificial Narrow Intelligence - ANI):** This is the **only type of AI that exists today.** It's designed and trained for a specific task or a narrow range of tasks.\n    *   *Examples:* Recommender systems (Netflix, Amazon), voice assistants, self-driving cars, medical diagnostic tools, spam filters, chess-playing computers. They can be incredibly good at their specific task but lack general understanding.\n2.  **General AI (Artificial General Intelligence - AGI):** This is **hypothetical AI** that would possess the ability to understand, learn, and apply intelligence across a wide range of tasks, just like a human. It would be able to perform any intellectual task that a human being can. We are not there yet.\n3.  **Super AI (Artificial Super Intelligence - ASI):** This is **purely speculative AI** that would far surpass human intelligence in virtually every field, including scientific creativity, general wisdom, and social skills. This is the realm of science fiction.\n\nIn summary, AI is about empowering machines to think, learn, and solve problems in ways that emulate or even exceed human capabilities, with the goal of automating tasks, discovering new insights, and improving human lives.",
+        "timestamp": "2026-06-13T05:16:40.119Z"
+      }
+    ],
+    "createdAt": "2026-06-13T05:13:36.621Z",
+    "updatedAt": "2026-06-13T05:16:40.124Z"
+  },
+  {
     "id": "1781198356453",
     "title": "Create a comparison table comp...",
     "messages": [

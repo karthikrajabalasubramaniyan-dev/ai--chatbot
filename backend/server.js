@@ -7,7 +7,11 @@ require("dotenv").config({ path: path.join(__dirname, ".env") });
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
 app.use(express.json());
 
 // Settings JSON database path and helpers
@@ -179,6 +183,92 @@ function getMockResponse(userMessage, model) {
   return prefix + resp;
 }
 
+// Web search helper querying Tavily or SerpAPI
+async function searchWeb(query) {
+  const apiKey = process.env.WEB_SEARCH_API_KEY || process.env.TAVILY_API_KEY || process.env.SERPAPI_API_KEY || "";
+  if (!apiKey) {
+    console.warn("WEB_SEARCH_API_KEY is not set. Using mock search fallback.");
+    return [
+      {
+        title: "Mock Search Result: AI Chatbot updates",
+        url: "https://ai-chatbot-mock.onrender.com/updates",
+        content: `Simulated search result snippet for: "${query}". Gemini chatbot web search integration is functional. Set a valid Tavily API key to get live search results.`
+      }
+    ];
+  }
+
+  // Detect which API engine is used
+  const isTavily = apiKey.startsWith("tvly-") || process.env.TAVILY_API_KEY || (!process.env.SERPAPI_API_KEY);
+
+  try {
+    if (isTavily) {
+      console.log(`Querying Tavily search for: "${query}"`);
+      const response = await fetch("https://api.tavily.com/search", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          api_key: apiKey,
+          query: query,
+          max_results: 5
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Tavily API responded with status ${response.status}: ${await response.text()}`);
+      }
+
+      const data = await response.json();
+      return (data.results || []).map(r => ({
+        title: r.title || "Search Result",
+        url: r.url || "",
+        content: r.content || ""
+      }));
+    } else {
+      console.log(`Querying SerpAPI search for: "${query}"`);
+      const url = `https://serpapi.com/search.json?q=${encodeURIComponent(query)}&api_key=${apiKey}&engine=google`;
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error(`SerpAPI responded with status ${response.status}: ${await response.text()}`);
+      }
+
+      const data = await response.json();
+      return (data.organic_results || []).slice(0, 5).map(r => ({
+        title: r.title || "Search Result",
+        url: r.link || r.url || "",
+        content: r.snippet || ""
+      }));
+    }
+  } catch (err) {
+    console.error("Web search API request failed:", err);
+    return [];
+  }
+}
+
+// Classifier helper to detect current/latest/news/realtime questions
+function isCurrentQuestion(message) {
+  const cleanMsg = message.toLowerCase();
+  
+  const keywords = [
+    "news", "weather", "sports", "score", "price", "stock", "rate", "election",
+    "today", "yesterday", "current", "latest", "recent", "now", "currently",
+    "happenings", "status of", "update on", "who is the current", "who is the president",
+    "who is the prime minister", "who won", "what is the price of", "politics", "cabinet",
+    "government posts", "yesterday's"
+  ];
+  
+  const years = /\b(2025|2026|2027)\b/;
+
+  const hasKeyword = keywords.some(kw => {
+    const rx = new RegExp(`\\b${kw}\\b`, "i");
+    return rx.test(cleanMsg);
+  });
+
+  return hasKeyword || years.test(cleanMsg);
+}
+
 // POST endpoint for chat
 app.post("/api/chat", async (req, res) => {
   const { message, history, model, attachment } = req.body;
@@ -232,8 +322,54 @@ app.post("/api/chat", async (req, res) => {
       }
 
       const chat = geminiModel.startChat({
-        history: formattedHistory,
-      });
+  history: [
+    {
+      role: "user",
+      parts: [{
+        text: "You are a helpful AI assistant. If the question asks current/latest information like politics, news, prices, sports, government posts, or live facts, say that the user should verify with latest official sources. Do not confidently guess current facts."
+      }]
+    },
+    {
+      role: "model",
+      parts: [{ text: "Understood." }]
+    },
+    ...formattedHistory
+  ],
+});
+
+      let finalPrompt = message;
+      let isSearchActive = false;
+
+      if (isCurrentQuestion(message)) {
+        const searchResults = await searchWeb(message);
+        if (searchResults && searchResults.length > 0) {
+          isSearchActive = true;
+          let contextText = "";
+          searchResults.forEach((res, idx) => {
+            contextText += `[Result ${idx + 1}] Title: ${res.title}\nURL: ${res.url}\nSnippet: ${res.content}\n\n`;
+          });
+
+          finalPrompt = `You are a helpful AI assistant with live web search capability.
+Answer the user's question accurately using the provided search results as your primary context.
+Prioritize these search results for current facts, dates, news, and events.
+At the end of your response, list the references you used under a clear "Sources:" heading with their corresponding clickable URLs from the search results.
+
+Web Search Results:
+${contextText}
+
+User Question:
+${message}`;
+        }
+      }
+
+      if (!isSearchActive) {
+        // Normal non-search system instruction wrapper
+        finalPrompt = `You are a helpful AI assistant.
+Answer the user's question to the best of your ability.
+
+User Question:
+${message}`;
+      }
 
       let result;
       if (attachment && attachment.data && attachment.mimeType) {
@@ -244,10 +380,10 @@ app.post("/api/chat", async (req, res) => {
               mimeType: attachment.mimeType
             }
           },
-          message
+          finalPrompt
         ]);
       } else {
-        result = await chat.sendMessage(message);
+        result = await chat.sendMessage(finalPrompt);
       }
       const responseText = result.response.text();
       res.json({ response: responseText });
