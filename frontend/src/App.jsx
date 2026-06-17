@@ -4,7 +4,7 @@ import ChatArea from "./components/ChatArea";
 import SettingsModal from "./components/SettingsModal";
 import { PanelLeft } from "lucide-react";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_BASE = "https://ai-chat-bot-jzug.onrender.com";
 const BACKEND_URL = `${API_BASE}/api/chat`;
 const HISTORY_URL = `${API_BASE}/api/history`;
 const SETTINGS_URL = `${API_BASE}/api/settings`;
@@ -139,6 +139,13 @@ export default function App() {
   // Get active conversation details
   const activeConversation = conversations.find(c => c.id === currentConversationId) || null;
 
+const speakText = (text) => {
+  const speech = new SpeechSynthesisUtterance(text);
+  speech.lang = "en-IN";
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(speech);
+};
+
   // Handle sending a new message
   const handleSendMessage = async (text, attachment) => {
     if (!text.trim()) return;
@@ -248,6 +255,7 @@ export default function App() {
       }
 
       const data = await response.json();
+      speakText(data.response);
       
       const aiMessage = {
         id: (Date.now() + 1).toString(),
