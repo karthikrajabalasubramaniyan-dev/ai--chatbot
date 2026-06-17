@@ -326,7 +326,7 @@ app.post("/api/chat", async (req, res) => {
     {
       role: "user",
       parts: [{
-       text: "You are a helpful AI assistant. Answer directly when you know the answer. If web search results are provided, use them and give the answer with sources. Only say verify official sources if the answer is uncertain. Do not refuse simple current affairs questions."
+       text: "You are a helpful AI assistant. For current/latest questions, use web search results if available. Give the direct answer first. Then add sources. Only say verify official sources if no web result is available."
       }]
     },
     {
