@@ -341,7 +341,9 @@ app.post("/api/chat", async (req, res) => {
       let isSearchActive = false;
 
       if (isCurrentQuestion(message)) {
-        const searchResults = await searchWeb(message);
+        const searchResults = await searchWeb(
+  `${message} latest 2026 official government source`
+);
         if (searchResults && searchResults.length > 0) {
           isSearchActive = true;
           let contextText = "";
@@ -350,6 +352,8 @@ app.post("/api/chat", async (req, res) => {
           });
 
           finalPrompt = `You are a helpful AI assistant with live web search capability.
+          Prefer official government websites over blogs, LinkedIn, Facebook, or old articles.
+Use the newest source available.
 Answer the user's question accurately using the provided search results as your primary context.
 Prioritize these search results for current facts, dates, news, and events.
 At the end of your response, list the references you used under a clear "Sources:" heading with their corresponding clickable URLs from the search results.
