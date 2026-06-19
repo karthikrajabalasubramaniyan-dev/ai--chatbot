@@ -199,10 +199,15 @@ async function searchWeb(query) {
 
   // Detect which API engine is used
   const isTavily = apiKey.startsWith("tvly-") || process.env.TAVILY_API_KEY || (!process.env.SERPAPI_API_KEY);
+  const isGovQuestion = /cm|chief minister|minister|government|governor|president|prime minister|official|tamil nadu/i.test(query);
+
+const searchQuery = isGovQuestion
+  ? `${query} site:tn.gov.in OR site:gov.in official current`
+  : `${query} latest current news`;
 
   try {
     if (isTavily) {
-      console.log(`Querying Tavily search for: "${query}"`);
+      console.log(`Querying Tavily search for: "${ searchQuery}"`);
       const response = await fetch("https://api.tavily.com/search", {
         method: "POST",
         headers: {
@@ -210,7 +215,7 @@ async function searchWeb(query) {
            "Authorization": `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-  query: `${query} site:gov.in OR site:tn.gov.in latest official`,
+ query: searchQuery,
   search_depth: "advanced",
   max_results: 5,
   include_answer: true,
