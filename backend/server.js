@@ -206,13 +206,16 @@ async function searchWeb(query) {
       const response = await fetch("https://api.tavily.com/search", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+           "Authorization": `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          api_key: apiKey,
-          query: query,
-          max_results: 5
-        })
+  query: `${query} site:gov.in OR site:tn.gov.in latest official`,
+  search_depth: "advanced",
+  max_results: 5,
+  include_answer: true,
+  include_raw_content: false
+})
       });
 
       if (!response.ok) {
@@ -344,6 +347,7 @@ app.post("/api/chat", async (req, res) => {
         const searchResults = await searchWeb(
   `${message} latest 2026 official government source`
 );
+ console.log("SEARCH RESULTS:", JSON.stringify(searchResults, null, 2));
         if (searchResults && searchResults.length > 0) {
           isSearchActive = true;
           let contextText = "";
