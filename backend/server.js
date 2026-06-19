@@ -185,7 +185,13 @@ function getMockResponse(userMessage, model) {
 
 // Web search helper querying Tavily or SerpAPI
 async function searchWeb(query) {
-  const apiKey = process.env.WEB_SEARCH_API_KEY || process.env.TAVILY_API_KEY || process.env.SERPAPI_API_KEY || "";
+  const apiKey = (
+  process.env.WEB_SEARCH_API_KEY ||
+  process.env.TAVILY_API_KEY ||
+  process.env.SERPAI_API_KEY ||
+  ""
+).replace(/\r/g, "").replace(/\n/g, "").trim();
+console.log("TAVILY KEY LENGTH:", apiKey.length);
   if (!apiKey) {
     console.warn("WEB_SEARCH_API_KEY is not set. Using mock search fallback.");
     return [
