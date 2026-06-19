@@ -208,6 +208,10 @@ const searchQuery = isGovQuestion
   try {
     if (isTavily) {
       console.log(`Querying Tavily search for: "${ searchQuery}"`);
+
+      console.log("TAVILY KEY FOUND:", !!process.env.TAVILY_API_KEY);
+console.log("KEY PREFIX:", process.env.TAVILY_API_KEY?.substring(0, 8));
+
       const response = await fetch("https://api.tavily.com/search", {
         method: "POST",
         headers: {
