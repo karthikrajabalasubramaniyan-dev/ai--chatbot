@@ -7,6 +7,13 @@ require("dotenv").config({ path: path.join(__dirname, ".env") });
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+app.get("/", (req, res) => {
+  res.json({
+    status: "Running",
+    message: "AI Chatbot Backend API"
+  });
+});
+
 app.use(cors({
   origin: "*",
   methods: ["GET", "POST", "DELETE", "OPTIONS"],
@@ -221,9 +228,9 @@ console.log("KEY PREFIX:", process.env.TAVILY_API_KEY?.substring(0, 8));
       const response = await fetch("https://api.tavily.com/search", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-           "Authorization": `Bearer ${apiKey},`
-        },
+  "Content-Type": "application/json",
+  "Authorization": `Bearer ${process.env.TAVILY_API_KEY}`
+},              
         body: JSON.stringify({
  query: searchQuery,
   search_depth: "advanced",
@@ -339,12 +346,29 @@ app.post("/api/chat", async (req, res) => {
         });
       }
 
+      const now = new Date();
+
+      const currentDateTime = now.toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata",
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+      console.log("CURRENT DATE:", currentDateTime);
+
+      const systemPrompt = `You are a helpful AI assistant. Current date and time in India is: ${currentDateTime}.
+If user asks current date/time, answer using this information.
+For current/latest questions, use web search results if available. Give the direct answer first. Then add sources. Only say verify official sources if no web result is available.`;
+
       const chat = geminiModel.startChat({
   history: [
     {
       role: "user",
       parts: [{
-       text: "You are a helpful AI assistant. For current/latest questions, use web search results if available. Give the direct answer first. Then add sources. Only say verify official sources if no web result is available."
+       text: systemPrompt
       }]
     },
     {
@@ -388,6 +412,14 @@ ${message}`;
       if (!isSearchActive) {
         // Normal non-search system instruction wrapper
         finalPrompt = `You are a helpful AI assistant.
+
+Current date and time in India:
+${currentDateTime}
+
+IMPORTANT:
+If the user asks today's date, current time, current year, current month, or day,
+always use the date and time above.
+
 Answer the user's question to the best of your ability.
 
 User Question:
