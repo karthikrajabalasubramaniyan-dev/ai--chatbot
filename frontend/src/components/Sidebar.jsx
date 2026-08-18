@@ -9,6 +9,7 @@ export default function Sidebar({
   onRenameConversation,
   onNewChat,
   onClearAll,
+  onLogout,
   theme,
   onToggleTheme,
   isOpen,
@@ -191,6 +192,12 @@ export default function Sidebar({
             {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
             <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
           </button>
+
+          {/* Logout Button */}
+<button className="footer-btn logout-btn" onClick={onLogout}>
+  <span>↪</span>
+  <span>Logout</span>
+</button>
           
           <div className="user-profile">
             <div className="profile-avatar">C</div>

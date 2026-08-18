@@ -1,6 +1,6 @@
 {
-  "appId": "com.aether.chat",
-  "appName": "Aether Chat",
+  "appId": "com.karthikai.chatbot",
+  "appName": "KarthikAI",
   "webDir": "dist",
   "server": {
     "androidScheme": "https"

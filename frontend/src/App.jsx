@@ -4,16 +4,43 @@ import ChatArea from "./components/ChatArea";
 import SettingsModal from "./components/SettingsModal";
 import { PanelLeft } from "lucide-react";
 
+
+import Login from "./components/Login";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "./firebase";
+import { signOut } from "firebase/auth";
+
+
 const API_BASE = "https://ai-chat-bot-jzug.onrender.com";
 const BACKEND_URL = `${API_BASE}/api/chat`;
 const HISTORY_URL = `${API_BASE}/api/history`;
 const SETTINGS_URL = `${API_BASE}/api/settings`;
 
 export default function App() {
+  const handleLogout = async () => {
+  try {
+    await signOut(auth);
+  } catch (error) {
+    console.error("Logout failed:", error);
+  }
+};
   const [conversations, setConversations] = useState(() => {
     const saved = localStorage.getItem("ai_chatbot_conversations");
     return saved ? JSON.parse(saved) : [];
   });
+
+      const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    setUser(currentUser);
+    setAuthLoading(false);
+  });
+
+  return () => unsubscribe();
+}, []);
+  
   
   const [currentConversationId, setCurrentConversationId] = useState(() => {
     return localStorage.getItem("ai_chatbot_current_id") || null;
@@ -51,6 +78,15 @@ export default function App() {
 
   useEffect(() => {
     fetchSettings();
+  }, []);
+  
+    useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setAuthLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const handleSaveSettings = async (newSettings) => {
@@ -346,6 +382,14 @@ const speakText = (text) => {
     }
   };
 
+    if (authLoading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!user) {
+    return <Login />;
+  }
+
   return (
     <div className="app-container">
       {/* Sidebar - render if not collapsed on desktop, and handle mobile layout */}
@@ -357,6 +401,7 @@ const speakText = (text) => {
         onRenameConversation={handleRenameConversation}
         onNewChat={handleNewChat}
         onClearAll={handleClearAll}
+        onLogout={handleLogout}
         theme={theme}
         onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
         isOpen={isMobileSidebarOpen}
