@@ -276,23 +276,46 @@ body.light-mode .code-block-header {
   width: 100%;
   border-collapse: collapse;
   margin: 1rem 0;
-  font-size: 0.9em;
+  font-size: 0.88rem;
+  line-height: 1.4;
 }
 
 .markdown-content th, 
 .markdown-content td {
-  border: 1px solid var(--border-color);
-  padding: 0.5rem 0.75rem;
+  padding: 10px 14px;
   text-align: left;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .markdown-content th {
-  background-color: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-main);
   font-weight: 600;
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.markdown-content td {
+  color: var(--text-main);
+  white-space: nowrap;
+}
+
+.markdown-content tr:hover td {
+  background: rgba(255, 255, 255, 0.03);
 }
 
 body.light-mode .markdown-content th {
-  background-color: rgba(0, 0, 0, 0.02);
+  background: rgba(0, 0, 0, 0.04);
+  color: #0f172a;
+}
+
+body.light-mode .markdown-content td {
+  color: #1e293b;
+}
+
+body.light-mode .markdown-content tr:hover td {
+  background: rgba(0, 0, 0, 0.02);
 }
 
 .markdown-content blockquote {
