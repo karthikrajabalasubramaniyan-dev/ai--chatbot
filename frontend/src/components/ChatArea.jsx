@@ -1,30 +1,41 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Menu, Sparkles, Code, MessageSquare, Table, PanelLeft, Mic, MicOff, VolumeX, Globe, Settings, Paperclip, FileText, X } from "lucide-react";
+import { 
+  Send, Menu, Sparkles, Code, MessageSquare, Table, PanelLeft, 
+  Mic, MicOff, VolumeX, Globe, Settings, Paperclip, FileText, X,
+  MapPin, CloudSun, CloudRain, Sun, Thermometer, Wind, Search, Check, ChevronDown, 
+  History, Calendar, Clock, ArrowRight, BarChart2, Navigation, Compass, Loader2
+} from "lucide-react";
 import MessageItem from "./MessageItem";
 import TypingIndicator from "./TypingIndicator";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
+const QUICK_CITIES = [
+  "Chennai", "Coimbatore", "Madurai", "Ooty", "Kochi", 
+  "Bengaluru", "Hyderabad", "Mumbai", "Delhi", "Kolkata", 
+  "Jaipur", "Lucknow", "Guwahati", "Srinagar", "Port Blair"
+];
+
 const SUGGESTIONS = [
   {
-    icon: <Sparkles size={16} className="suggest-icon sparkle" />,
-    text: "Explain quantum computing in simple terms",
-    prompt: "Explain quantum computing in simple terms, using a creative analogy."
+    icon: <Sun size={16} className="suggest-icon sparkle" />,
+    text: "What's the weather now?",
+    prompt: "What's the weather now?"
   },
   {
-    icon: <Code size={16} className="suggest-icon code" />,
-    text: "Write a JS function to filter even numbers",
-    prompt: "Write a JavaScript function to filter even numbers from an array and explain how it works."
+    icon: <CloudRain size={16} className="suggest-icon code" />,
+    text: "Will it rain tomorrow?",
+    prompt: "Will it rain tomorrow?"
   },
   {
-    icon: <Table size={16} className="suggest-icon table" />,
-    text: "Compare REST vs WebSockets",
-    prompt: "Create a comparison table comparing REST APIs and WebSockets based on features, protocols, and use cases."
+    icon: <History size={16} className="suggest-icon table" />,
+    text: "What was the weather yesterday?",
+    prompt: "What was the weather yesterday?"
   },
   {
-    icon: <MessageSquare size={16} className="suggest-icon message" />,
-    text: "What are your capabilities?",
-    prompt: "Help me understand what you can do and what features you support."
+    icon: <BarChart2 size={16} className="suggest-icon message" />,
+    text: "Compare today's weather with yesterday",
+    prompt: "Compare today's weather with yesterday."
   }
 ];
 
@@ -36,12 +47,49 @@ export default function ChatArea({
   isSidebarOpen,
   activeModel,
   onChangeModel,
-  onOpenSettings
+  onOpenSettings,
+  activeCity = "Chennai",
+  onCityChange
 }) {
   const [input, setInput] = useState("");
-  const [voiceStatus, setVoiceStatus] = useState("idle"); // "idle" | "listening" | "processing" | "error"
+  const [voiceStatus, setVoiceStatus] = useState("idle");
   
-  // PDF Attachment States
+  // Weather Tabs State: "none" | "current" | "forecast" | "historical"
+  const [activeWeatherTab, setActiveWeatherTab] = useState("none");
+  const [forecastData, setForecastData] = useState(null);
+  const [isForecastLoading, setIsForecastLoading] = useState(false);
+
+  // Historical Section State
+  const [histCity, setHistCity] = useState(activeCity);
+  const [histStartDate, setHistStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return d.toISOString().split("T")[0];
+  });
+  const [histEndDate, setHistEndDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().split("T")[0];
+  });
+  const [historicalRecords, setHistoricalRecords] = useState(null);
+  const [isHistLoading, setIsHistLoading] = useState(false);
+  const [histError, setHistError] = useState(null);
+
+  // India-Wide Location Search & Autocomplete State
+  const [isCityDropdownOpen, setIsCityDropdownOpen] = useState(false);
+  const [citySearchInput, setCitySearchInput] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isGeoLoading, setIsGeoLoading] = useState(false);
+  const [recentLocations, setRecentLocations] = useState(() => {
+    const saved = localStorage.getItem("weathergpt_recent_locations");
+    return saved ? JSON.parse(saved) : ["Chennai", "Coimbatore", "Madurai", "Bengaluru", "Mumbai"];
+  });
+
+  const [cityWeatherSummary, setCityWeatherSummary] = useState(null);
+  const dropdownRef = useRef(null);
+
+  // PDF & Image Attachment States
   const [selectedFile, setSelectedFile] = useState(null);
   const [isParsing, setIsParsing] = useState(false);
   const [extractedText, setExtractedText] = useState("");
@@ -50,7 +98,7 @@ export default function ChatArea({
   const fileInputRef = useRef(null);
   const [voiceLanguage, setVoiceLanguage] = useState("en-US");
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isVoiceInputSupported, setIsVoiceInputSupported] = useState(() => {
+  const [isVoiceInputSupported] = useState(() => {
     return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
   });
   const [voiceError, setVoiceError] = useState(null);
@@ -60,7 +108,160 @@ export default function ChatArea({
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef(null);
 
-  // Clean up recognition on unmount
+  // Sync histCity with activeCity
+  useEffect(() => {
+    setHistCity(activeCity);
+  }, [activeCity]);
+
+  // Save recent locations to localStorage
+  const saveRecentLocation = (loc) => {
+    if (!loc) return;
+    setRecentLocations(prev => {
+      const filtered = prev.filter(item => item.toLowerCase() !== loc.toLowerCase());
+      const updated = [loc, ...filtered].slice(0, 8);
+      localStorage.setItem("weathergpt_recent_locations", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  // Live Location Autocomplete Debounce
+  useEffect(() => {
+    if (!citySearchInput || citySearchInput.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/weather/search?q=${encodeURIComponent(citySearchInput.trim())}&limit=8`);
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(data);
+        }
+      } catch (err) {
+        console.warn("Autocomplete error:", err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 280);
+
+    return () => clearTimeout(timer);
+  }, [citySearchInput]);
+
+  // Fetch quick current weather snapshot for active city
+  useEffect(() => {
+    let isCancelled = false;
+    const fetchCityWeather = async () => {
+      if (!activeCity) return;
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/weather/current?city=${encodeURIComponent(activeCity)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (!isCancelled) {
+            setCityWeatherSummary(data);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch city weather snapshot:", err);
+      }
+    };
+
+    fetchCityWeather();
+    return () => {
+      isCancelled = true;
+    };
+  }, [activeCity]);
+
+  // Fetch forecast when forecast tab opened
+  const handleOpenForecast = async () => {
+    if (activeWeatherTab === "forecast") {
+      setActiveWeatherTab("none");
+      return;
+    }
+    setActiveWeatherTab("forecast");
+    setIsForecastLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/weather/forecast?city=${encodeURIComponent(activeCity)}&days=7`);
+      if (res.ok) {
+        const data = await res.json();
+        setForecastData(data);
+      }
+    } catch (err) {
+      console.warn("Forecast fetch error:", err);
+    } finally {
+      setIsForecastLoading(false);
+    }
+  };
+
+  // Fetch historical weather
+  const handleFetchHistory = async (e) => {
+    if (e) e.preventDefault();
+    if (!histCity || !histStartDate || !histEndDate) return;
+    setIsHistLoading(true);
+    setHistError(null);
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/v1/weather/history?city=${encodeURIComponent(histCity)}&start_date=${histStartDate}&end_date=${histEndDate}`
+      );
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `Server responded with status ${res.status}`);
+      }
+      const data = await res.json();
+      setHistoricalRecords(data);
+    } catch (err) {
+      setHistError(err.message || "Failed to load historical data");
+    } finally {
+      setIsHistLoading(false);
+    }
+  };
+
+  // Browser Geolocation ("Use My Location")
+  const handleUseMyLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser.");
+      return;
+    }
+    setIsGeoLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        try {
+          const res = await fetch(`${API_BASE}/api/v1/weather/current?city=${lat},${lon}`);
+          if (res.ok) {
+            const data = await res.json();
+            const resolved = data.cityName || data.location || `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
+            handleCitySelect(resolved);
+          }
+        } catch (err) {
+          console.warn("Reverse location error:", err);
+          handleCitySelect(`${lat.toFixed(2)}, ${lon.toFixed(2)}`);
+        } finally {
+          setIsGeoLoading(false);
+        }
+      },
+      (err) => {
+        setIsGeoLoading(false);
+        alert("Unable to retrieve your location. Please check location permissions.");
+      },
+      { timeout: 10000, enableHighAccuracy: true }
+    );
+  };
+
+  // Close city dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsCityDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Clean up media recorder on unmount
   useEffect(() => {
     return () => {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
@@ -69,7 +270,6 @@ export default function ChatArea({
     };
   }, []);
 
-  // Periodically check if synthesis is speaking
   useEffect(() => {
     const checkSpeaking = setInterval(() => {
       if (window.speechSynthesis) {
@@ -78,6 +278,26 @@ export default function ChatArea({
     }, 250);
     return () => clearInterval(checkSpeaking);
   }, []);
+
+  const handleCitySelect = (city) => {
+    if (city && city.trim()) {
+      const clean = city.trim();
+      onCityChange?.(clean);
+      saveRecentLocation(clean);
+      setIsCityDropdownOpen(false);
+      setCitySearchInput("");
+      setSearchResults([]);
+    }
+  };
+
+  const handleCitySearchSubmit = (e) => {
+    e.preventDefault();
+    if (searchResults.length > 0) {
+      handleCitySelect(searchResults[0].displayName || searchResults[0].name);
+    } else if (citySearchInput.trim()) {
+      handleCitySelect(citySearchInput.trim());
+    }
+  };
 
   const startRecording = async () => {
     if (!isVoiceInputSupported) {
@@ -88,11 +308,8 @@ export default function ChatArea({
 
     try {
       setVoiceError(null);
-      
-      // Request mic permission and stream
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunksRef.current = [];
-      
       const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
       
       mediaRecorder.ondataavailable = (event) => {
@@ -102,7 +319,6 @@ export default function ChatArea({
       };
 
       mediaRecorder.onstop = async () => {
-        // Stop all audio tracks to release microphone
         stream.getTracks().forEach(track => track.stop());
         
         if (!audioChunksRef.current || audioChunksRef.current.length === 0) {
@@ -116,7 +332,6 @@ export default function ChatArea({
         setVoiceStatus("processing");
 
         try {
-          // Convert Blob to Base64
           const base64Audio = await new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.readAsDataURL(audioBlob);
@@ -127,12 +342,9 @@ export default function ChatArea({
             reader.onerror = reject;
           });
 
-          // Send to Express backend for Gemini transcription
-          const response = await fetch(`${API_BASE}/api/transcribe`, {
+          const response = await fetch(`${API_BASE}/api/v1/transcribe`, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               audio: base64Audio,
               mimeType: "audio/webm",
@@ -140,22 +352,12 @@ export default function ChatArea({
             })
           });
 
-          if (!response.ok) {
-            throw new Error(`Server error: ${response.status}`);
-          }
-
+          if (!response.ok) throw new Error(`Server error: ${response.status}`);
           const data = await response.json();
-          if (data.error) {
-            throw new Error(data.error);
-          }
-
           const transcriptionText = data.text || "";
           
           if (transcriptionText.trim()) {
-            setInput(prev => {
-              const separator = prev.trim() ? " " : "";
-              return prev + separator + transcriptionText;
-            });
+            setInput(prev => (prev.trim() ? prev + " " + transcriptionText : transcriptionText));
             setVoiceStatus("idle");
           } else {
             setVoiceError("No speech detected. Please speak clearly.");
@@ -165,10 +367,9 @@ export default function ChatArea({
               setVoiceError(null);
             }, 3000);
           }
-
         } catch (err) {
           console.warn("Transcription failed:", err);
-          setVoiceError("Transcription service failed. Please type instead.");
+          setVoiceError("Transcription service failed.");
           setVoiceStatus("error");
           setTimeout(() => {
             setVoiceStatus("idle");
@@ -183,7 +384,7 @@ export default function ChatArea({
 
     } catch (err) {
       console.warn("Microphone access failed:", err);
-      setVoiceError("Microphone permission denied or device occupied.");
+      setVoiceError("Microphone permission denied.");
       setVoiceStatus("error");
       setTimeout(() => {
         setVoiceStatus("idle");
@@ -220,7 +421,6 @@ export default function ChatArea({
 
   const messages = conversation?.messages || [];
 
-  // Auto scroll to latest message
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -229,7 +429,6 @@ export default function ChatArea({
     scrollToBottom();
   }, [messages, isLoading]);
 
-  // Auto-resize input textarea
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -239,12 +438,11 @@ export default function ChatArea({
 
   const handleFileChange = async (file) => {
     if (!file) return;
-
     const isPdf = file.type === "application/pdf";
     const isImage = file.type.startsWith("image/");
 
     if (!isPdf && !isImage) {
-      alert("Only PDF documents and image files are supported for analysis.");
+      alert("Only PDF documents and image files are supported.");
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
@@ -252,8 +450,7 @@ export default function ChatArea({
     setSelectedFile(file);
 
     if (isImage) {
-      setIsParsing(false); // No text extraction parsing needed for images
-      
+      setIsParsing(false);
       const reader = new FileReader();
       reader.onload = (e) => {
         const base64 = e.target.result.split(",")[1];
@@ -263,8 +460,6 @@ export default function ChatArea({
       setExtractedText("");
     } else if (isPdf) {
       setIsParsing(true);
-
-      // Read raw file as Base64 for Gemini direct API routing
       const reader = new FileReader();
       reader.onload = (e) => {
         const base64 = e.target.result.split(",")[1];
@@ -272,14 +467,10 @@ export default function ChatArea({
       };
       reader.readAsDataURL(file);
 
-      // Extract text client-side for OpenAI & Claude prompt injections
       try {
         const arrayBuffer = await file.arrayBuffer();
         const pdfjsLib = window["pdfjs-dist/build/pdf"];
-        if (!pdfjsLib) {
-          throw new Error("PDF.js library is not loaded from CDN.");
-        }
-
+        if (!pdfjsLib) throw new Error("PDF.js library is not loaded.");
         pdfjsLib.GlobalWorkerOptions.workerSrc =
           "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
@@ -312,7 +503,7 @@ export default function ChatArea({
     
     const attachment = selectedFile ? {
       data: base64Data,
-      mimeType: "application/pdf",
+      mimeType: selectedFile.type.startsWith("image/") ? selectedFile.type : "application/pdf",
       extractedText: extractedText,
       fileName: selectedFile.name
     } : null;
@@ -344,20 +535,21 @@ export default function ChatArea({
           </button>
           
           <div className="header-title-container">
-            <h2 className="header-title">{conversation?.title || "New Chat"}</h2>
-            <span className="header-badge">{isLoading ? "Generating..." : "Ready"}</span>
+            <h2 className="header-title">{conversation?.title || "WeatherGPT Chat"}</h2>
+            <span className="header-badge">{isLoading ? "Thinking..." : "All-India Weather Live"}</span>
           </div>
         </div>
 
         <div className="header-right">
           <div className="model-selector-wrapper">
             <select
-              value={activeModel || "gemini"}
+              value={activeModel || "groq"}
               onChange={(e) => onChangeModel?.(e.target.value)}
               className="model-dropdown-select glass-panel"
               title="Select AI Model"
               disabled={isLoading}
             >
+              <option value="groq">Groq (LLaMA / GPT-OSS)</option>
               <option value="gemini">Gemini 2.5 Flash</option>
               <option value="openai">OpenAI GPT-4o-mini</option>
               <option value="claude">Claude 3.5 Sonnet</option>
@@ -373,17 +565,314 @@ export default function ChatArea({
         </div>
       </header>
 
+      {/* Active City & Weather Data Navigation Bar */}
+      <div className="active-city-bar glass-panel" ref={dropdownRef}>
+        <div className="city-bar-left">
+          <button 
+            className="city-selector-btn"
+            onClick={() => setIsCityDropdownOpen(!isCityDropdownOpen)}
+            title="Search any location across India or the world"
+          >
+            <MapPin size={15} className="pin-icon" />
+            <span className="active-city-label">Location:</span>
+            <span className="active-city-name">{activeCity}</span>
+            <ChevronDown size={14} className={`chevron-icon ${isCityDropdownOpen ? "open" : ""}`} />
+          </button>
+
+          {/* Weather Context Tabs */}
+          <div className="weather-nav-tabs">
+            <button
+              className={`weather-tab-btn ${activeWeatherTab === "current" ? "active" : ""}`}
+              onClick={() => setActiveWeatherTab(activeWeatherTab === "current" ? "none" : "current")}
+              title="View current weather"
+            >
+              <Sun size={13} />
+              <span>Current</span>
+            </button>
+            <button
+              className={`weather-tab-btn ${activeWeatherTab === "forecast" ? "active" : ""}`}
+              onClick={handleOpenForecast}
+              title="View 7-day forecast"
+            >
+              <CloudSun size={13} />
+              <span>Forecast</span>
+            </button>
+            <button
+              className={`weather-tab-btn ${activeWeatherTab === "historical" ? "active" : ""}`}
+              onClick={() => {
+                setActiveWeatherTab(activeWeatherTab === "historical" ? "none" : "historical");
+                if (activeWeatherTab !== "historical" && !historicalRecords) {
+                  handleFetchHistory();
+                }
+              }}
+              title="Search and view historical weather archive"
+            >
+              <History size={13} />
+              <span>Historical</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Quick Popular City Chips (All across India & Global) */}
+        <div className="quick-city-chips">
+          {QUICK_CITIES.map((c) => (
+            <button
+              key={c}
+              className={`city-chip ${activeCity.toLowerCase().includes(c.toLowerCase()) ? "active" : ""}`}
+              onClick={() => handleCitySelect(c)}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+
+        {/* India-Wide Location Search & Autocomplete Dropdown Modal */}
+        {isCityDropdownOpen && (
+          <div className="city-dropdown-menu glass-panel animate-fade-in">
+            <form onSubmit={handleCitySearchSubmit} className="city-search-form">
+              <Search size={15} className="city-search-icon" />
+              <input
+                type="text"
+                placeholder="Search any city or location in India..."
+                value={citySearchInput}
+                onChange={(e) => setCitySearchInput(e.target.value)}
+                className="city-search-input"
+                autoFocus
+              />
+              {isSearching && <Loader2 size={14} className="animate-spin text-purple-400" />}
+              <button type="submit" className="city-search-submit-btn">
+                Search
+              </button>
+            </form>
+
+            {/* Geolocation Button */}
+            <div className="geo-location-wrapper">
+              <button 
+                type="button" 
+                className="use-my-location-btn" 
+                onClick={handleUseMyLocation}
+                disabled={isGeoLoading}
+              >
+                {isGeoLoading ? <Loader2 size={14} className="animate-spin" /> : <Navigation size={14} />}
+                <span>{isGeoLoading ? "Detecting location..." : "Use my current location"}</span>
+              </button>
+            </div>
+
+            {/* Live Autocomplete Results */}
+            {searchResults.length > 0 && (
+              <div className="autocomplete-results-container">
+                <div className="dropdown-section-label">Matching Locations in India & Worldwide</div>
+                <div className="dropdown-suggestions-list">
+                  {searchResults.map((item) => (
+                    <div
+                      key={item.id || item.displayName}
+                      className="dropdown-suggestion-item"
+                      onClick={() => handleCitySelect(item.displayName || item.name)}
+                    >
+                      <MapPin size={13} className="pin-suggest" />
+                      <div className="suggest-info">
+                        <span className="suggest-name">{item.name}</span>
+                        <span className="suggest-details">
+                          {[item.admin1, item.country].filter(Boolean).join(", ")}
+                        </span>
+                      </div>
+                      {item.countryCode === "IN" && (
+                        <span className="india-badge">India</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="dropdown-divider"></div>
+
+            {/* Recent Locations */}
+            {recentLocations.length > 0 && (
+              <div className="recent-locations-section">
+                <div className="dropdown-section-label">Recent Searches</div>
+                <div className="recent-tags-row">
+                  {recentLocations.map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      className="recent-tag-btn"
+                      onClick={() => handleCitySelect(item)}
+                    >
+                      <Clock size={11} />
+                      <span>{item}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Expandable Weather Data Panels */}
+      {activeWeatherTab === "current" && cityWeatherSummary && (
+        <div className="weather-drawer-panel glass-panel animate-fade-in">
+          <div className="drawer-header">
+            <div className="drawer-title">
+              <Sun size={16} className="text-amber-400" />
+              <span>Current Weather: <strong>{cityWeatherSummary.location}</strong></span>
+            </div>
+            <button className="drawer-close-btn" onClick={() => setActiveWeatherTab("none")}>
+              <X size={14} />
+            </button>
+          </div>
+          <div className="current-grid">
+            <div className="metric-card">
+              <span className="metric-label">Temperature</span>
+              <span className="metric-val">{cityWeatherSummary.temperature}°C</span>
+              <span className="metric-sub">Feels like {cityWeatherSummary.feelsLike}°C</span>
+            </div>
+            <div className="metric-card">
+              <span className="metric-label">Condition</span>
+              <span className="metric-val">{cityWeatherSummary.condition}</span>
+              <span className="metric-sub">UV Index: {cityWeatherSummary.uvIndex}</span>
+            </div>
+            <div className="metric-card">
+              <span className="metric-label">Humidity & Pressure</span>
+              <span className="metric-val">{cityWeatherSummary.humidity}%</span>
+              <span className="metric-sub">{cityWeatherSummary.pressure} hPa</span>
+            </div>
+            <div className="metric-card">
+              <span className="metric-label">Wind & Rain</span>
+              <span className="metric-val">{cityWeatherSummary.windSpeed} km/h</span>
+              <span className="metric-sub">{cityWeatherSummary.rainProbability}% rain chance</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeWeatherTab === "forecast" && (
+        <div className="weather-drawer-panel glass-panel animate-fade-in">
+          <div className="drawer-header">
+            <div className="drawer-title">
+              <CloudSun size={16} className="text-sky-400" />
+              <span>7-Day Weather Forecast: <strong>{activeCity}</strong></span>
+            </div>
+            <button className="drawer-close-btn" onClick={() => setActiveWeatherTab("none")}>
+              <X size={14} />
+            </button>
+          </div>
+          {isForecastLoading ? (
+            <div className="drawer-loading">Loading 7-day meteorological forecast...</div>
+          ) : forecastData?.forecast ? (
+            <div className="forecast-cards-row">
+              {forecastData.forecast.map((f, i) => (
+                <div key={i} className="forecast-card">
+                  <span className="fc-day">{f.dayName}</span>
+                  <span className="fc-date">{f.date.slice(5)}</span>
+                  <span className="fc-temp">{f.maxTemp}° / {f.minTemp}°</span>
+                  <span className="fc-cond">{f.condition}</span>
+                  <span className="fc-rain">💧 {f.rainProbability}%</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="drawer-empty">Forecast data unavailable.</div>
+          )}
+        </div>
+      )}
+
+      {activeWeatherTab === "historical" && (
+        <div className="weather-drawer-panel glass-panel animate-fade-in">
+          <div className="drawer-header">
+            <div className="drawer-title">
+              <History size={16} className="text-purple-400" />
+              <span>Historical Weather Archive</span>
+            </div>
+            <button className="drawer-close-btn" onClick={() => setActiveWeatherTab("none")}>
+              <X size={14} />
+            </button>
+          </div>
+
+          <form onSubmit={handleFetchHistory} className="historical-filter-bar">
+            <div className="hist-input-group">
+              <label>Location</label>
+              <input
+                type="text"
+                value={histCity}
+                onChange={(e) => setHistCity(e.target.value)}
+                placeholder="Any Indian town, district or city"
+                className="hist-input"
+                required
+              />
+            </div>
+            <div className="hist-input-group">
+              <label>Start Date</label>
+              <input
+                type="date"
+                value={histStartDate}
+                onChange={(e) => setHistStartDate(e.target.value)}
+                className="hist-input"
+                required
+              />
+            </div>
+            <div className="hist-input-group">
+              <label>End Date</label>
+              <input
+                type="date"
+                value={histEndDate}
+                onChange={(e) => setHistEndDate(e.target.value)}
+                className="hist-input"
+                required
+              />
+            </div>
+            <button type="submit" className="hist-submit-btn" disabled={isHistLoading}>
+              {isHistLoading ? "Fetching..." : "View History"}
+            </button>
+          </form>
+
+          {histError && <div className="hist-error-text">⚠️ {histError}</div>}
+
+          {historicalRecords?.records && (
+            <div className="historical-table-wrapper">
+              <table className="historical-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Condition</th>
+                    <th>Max / Min</th>
+                    <th>Mean</th>
+                    <th>Humidity</th>
+                    <th>Wind</th>
+                    <th>Rain</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historicalRecords.records.map((r, i) => (
+                    <tr key={i}>
+                      <td><strong>{r.date}</strong></td>
+                      <td>{r.condition}</td>
+                      <td>{r.maxTemp}°C / {r.minTemp}°C</td>
+                      <td>{r.meanTemp}°C</td>
+                      <td>{r.humidity}%</td>
+                      <td>{r.windSpeedMax} km/h</td>
+                      <td>{r.precipitation} mm</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Main Message Stream */}
       <div className="message-stream-container">
         {messages.length === 0 ? (
           <div className="welcome-container animate-fade-in">
             <div className="welcome-glow"></div>
             <div className="welcome-logo">
-              <Sparkles size={36} className="logo-sparkle" />
+              <CloudSun size={38} className="logo-weather" />
             </div>
-            <h1 className="welcome-title">How can I help you today?</h1>
+            <h1 className="welcome-title">WeatherGPT Intelligence</h1>
             <p className="welcome-subtitle">
-              Ask me about coding, scientific concepts, or let me structure reports for you.
+              Verified real meteorological AI across <strong>all states, districts, cities & towns in India</strong>. Currently active: <strong className="highlight-city">{activeCity}</strong>.
             </p>
 
             <div className="suggestions-grid">
@@ -486,12 +975,12 @@ export default function ChatArea({
             onKeyDown={handleKeyDown}
             placeholder={
               isParsing
-                ? "Parsing PDF document..."
+                ? "Parsing document..."
                 : voiceStatus === "listening"
                 ? "Listening... Click microphone to finish speaking..."
                 : voiceStatus === "processing"
                 ? "Transcribing voice input..."
-                : "Message AI Chatbot..."
+                : `Ask WeatherGPT about ${activeCity} or any Indian location...`
             }
             className={`chat-textarea ${voiceStatus === "listening" ? "textarea-listening" : ""} ${voiceStatus === "processing" ? "textarea-processing" : ""}`}
             disabled={isLoading || voiceStatus === "processing" || isParsing}
@@ -516,7 +1005,7 @@ export default function ChatArea({
             onClick={toggleListening}
             title={
               !isVoiceInputSupported
-                ? (voiceError || "Audio input is not supported in this environment")
+                ? (voiceError || "Audio input is not supported")
                 : voiceStatus === "listening"
                 ? "Stop listening & transcribe"
                 : voiceStatus === "processing"
@@ -543,7 +1032,7 @@ export default function ChatArea({
           </p>
         ) : (
           <p className="input-disclaimer">
-            AI Chatbot can make mistakes. Verify important info. Built using React + Node.js.
+            Real meteorological data for all of India. Active location: <strong>{activeCity}</strong>.
           </p>
         )}
       </footer>
@@ -677,9 +1166,460 @@ export default function ChatArea({
           font-weight: 500;
           padding: 2px 8px;
           border-radius: 9999px;
-          background: rgba(139, 92, 246, 0.1);
+          background: rgba(16, 185, 129, 0.1);
+          color: #10b981;
+          border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        /* Active City & Tabs Bar */
+        .active-city-bar {
+          padding: 8px 1.5rem;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          border-bottom: 1px solid var(--border-color);
+          background-color: rgba(14, 19, 31, 0.5);
+          position: relative;
+          z-index: 20;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+        body.light-mode .active-city-bar {
+          background-color: rgba(243, 244, 246, 0.8);
+        }
+
+        .city-bar-left {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
+        .city-selector-btn {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 5px 12px;
+          border-radius: 10px;
+          background-color: rgba(139, 92, 246, 0.1);
+          border: 1px solid rgba(139, 92, 246, 0.3);
+          color: var(--text-main);
+          font-size: 0.85rem;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .city-selector-btn:hover {
+          background-color: rgba(139, 92, 246, 0.2);
+          border-color: var(--primary);
+        }
+        .pin-icon {
           color: var(--primary);
-          border: 1px solid rgba(139, 92, 246, 0.2);
+        }
+        .active-city-label {
+          color: var(--text-muted);
+          font-size: 0.75rem;
+        }
+        .active-city-name {
+          font-weight: 600;
+          color: var(--text-main);
+          max-width: 180px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .chevron-icon {
+          color: var(--text-muted);
+          transition: transform 0.2s;
+        }
+        .chevron-icon.open {
+          transform: rotate(180deg);
+        }
+
+        .weather-nav-tabs {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          background-color: rgba(255, 255, 255, 0.03);
+          padding: 2px 4px;
+          border-radius: 10px;
+          border: 1px solid var(--border-color);
+        }
+        .weather-tab-btn {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          padding: 4px 10px;
+          border-radius: 8px;
+          font-size: 0.75rem;
+          font-weight: 500;
+          color: var(--text-muted);
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .weather-tab-btn:hover {
+          color: var(--text-main);
+          background-color: rgba(255, 255, 255, 0.05);
+        }
+        .weather-tab-btn.active {
+          background-color: var(--primary);
+          color: #ffffff;
+          font-weight: 600;
+        }
+
+        .quick-city-chips {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          overflow-x: auto;
+          scrollbar-width: none;
+          max-width: 450px;
+        }
+        .quick-city-chips::-webkit-scrollbar {
+          display: none;
+        }
+        .city-chip {
+          font-size: 0.75rem;
+          padding: 3px 10px;
+          border-radius: 9999px;
+          background-color: rgba(255, 255, 255, 0.03);
+          border: 1px solid var(--border-color);
+          color: var(--text-muted);
+          cursor: pointer;
+          transition: all 0.2s;
+          white-space: nowrap;
+        }
+        .city-chip:hover {
+          background-color: rgba(255, 255, 255, 0.08);
+          color: var(--text-main);
+          border-color: var(--border-color-active);
+        }
+        .city-chip.active {
+          background-color: var(--primary);
+          color: #ffffff;
+          border-color: var(--primary);
+          font-weight: 600;
+        }
+
+        /* Drawer Panels for Weather Data */
+        .weather-drawer-panel {
+          padding: 1rem 1.5rem;
+          border-bottom: 1px solid var(--border-color);
+          background-color: rgba(10, 14, 24, 0.9);
+          backdrop-filter: blur(16px);
+          z-index: 15;
+        }
+        body.light-mode .weather-drawer-panel {
+          background-color: rgba(255, 255, 255, 0.95);
+        }
+
+        .drawer-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 0.75rem;
+        }
+        .drawer-title {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 0.9rem;
+          color: var(--text-main);
+        }
+        .drawer-close-btn {
+          width: 24px;
+          height: 24px;
+          border-radius: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: var(--text-muted);
+        }
+        .drawer-close-btn:hover {
+          color: var(--text-main);
+          background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .current-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 10px;
+        }
+        .metric-card {
+          padding: 0.75rem;
+          border-radius: 12px;
+          background-color: rgba(255, 255, 255, 0.02);
+          border: 1px solid var(--border-color);
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+        .metric-label {
+          font-size: 0.7rem;
+          color: var(--text-muted);
+          text-transform: uppercase;
+          font-weight: 600;
+        }
+        .metric-val {
+          font-size: 1.1rem;
+          font-weight: 700;
+          color: var(--primary);
+        }
+        .metric-sub {
+          font-size: 0.75rem;
+          color: var(--text-main);
+        }
+
+        .forecast-cards-row {
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+          gap: 8px;
+          overflow-x: auto;
+        }
+        .forecast-card {
+          padding: 0.75rem 0.5rem;
+          border-radius: 12px;
+          background-color: rgba(255, 255, 255, 0.02);
+          border: 1px solid var(--border-color);
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          gap: 3px;
+        }
+        .fc-day { font-size: 0.8rem; font-weight: 600; color: var(--text-main); }
+        .fc-date { font-size: 0.65rem; color: var(--text-muted); }
+        .fc-temp { font-size: 0.85rem; font-weight: 700; color: var(--primary); }
+        .fc-cond { font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .fc-rain { font-size: 0.7rem; color: #38bdf8; font-weight: 600; }
+
+        .historical-filter-bar {
+          display: flex;
+          align-items: flex-end;
+          gap: 10px;
+          margin-bottom: 0.75rem;
+          flex-wrap: wrap;
+        }
+        .hist-input-group {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+        .hist-input-group label {
+          font-size: 0.7rem;
+          color: var(--text-muted);
+          font-weight: 600;
+        }
+        .hist-input {
+          padding: 5px 10px;
+          border-radius: 8px;
+          background-color: rgba(255, 255, 255, 0.03);
+          border: 1px solid var(--border-color);
+          color: var(--text-main);
+          font-size: 0.8rem;
+          outline: none;
+        }
+        body.light-mode .hist-input {
+          background-color: rgba(0, 0, 0, 0.02);
+        }
+        .hist-submit-btn {
+          padding: 6px 14px;
+          border-radius: 8px;
+          background-color: var(--primary);
+          color: white;
+          font-size: 0.8rem;
+          font-weight: 600;
+          cursor: pointer;
+        }
+        .hist-error-text {
+          font-size: 0.75rem;
+          color: #ef4444;
+          margin-bottom: 0.5rem;
+        }
+        .historical-table-wrapper {
+          max-height: 200px;
+          overflow-y: auto;
+          border-radius: 10px;
+          border: 1px solid var(--border-color);
+        }
+        .historical-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 0.78rem;
+          text-align: left;
+        }
+        .historical-table th, .historical-table td {
+          padding: 6px 10px;
+          border-bottom: 1px solid var(--border-color);
+        }
+        .historical-table th {
+          background-color: rgba(255, 255, 255, 0.02);
+          color: var(--text-muted);
+          font-weight: 600;
+        }
+
+        /* Location Search Dropdown Modal */
+        .city-dropdown-menu {
+          position: absolute;
+          top: calc(100% + 4px);
+          left: 1.5rem;
+          width: 380px;
+          background-color: rgba(14, 19, 31, 0.96);
+          border: 1px solid var(--border-color-active);
+          border-radius: 16px;
+          box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+          padding: 14px;
+          backdrop-filter: blur(20px);
+          z-index: 50;
+        }
+        body.light-mode .city-dropdown-menu {
+          background-color: rgba(255, 255, 255, 0.98);
+        }
+
+        .city-search-form {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          background-color: rgba(255, 255, 255, 0.05);
+          border: 1px solid var(--border-color);
+          border-radius: 12px;
+          padding: 8px 12px;
+        }
+        body.light-mode .city-search-form {
+          background-color: rgba(0, 0, 0, 0.03);
+        }
+        .city-search-icon {
+          color: var(--primary);
+          flex-shrink: 0;
+        }
+        .city-search-input {
+          flex-grow: 1;
+          background: transparent;
+          border: none;
+          outline: none;
+          color: var(--text-main);
+          font-size: 0.88rem;
+        }
+        .city-search-submit-btn {
+          font-size: 0.75rem;
+          padding: 4px 10px;
+          border-radius: 8px;
+          background-color: var(--primary);
+          color: white;
+          font-weight: 600;
+        }
+
+        .geo-location-wrapper {
+          margin-top: 8px;
+        }
+        .use-my-location-btn {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          width: 100%;
+          padding: 7px 10px;
+          border-radius: 8px;
+          background-color: rgba(56, 189, 248, 0.1);
+          border: 1px solid rgba(56, 189, 248, 0.25);
+          color: #38bdf8;
+          font-size: 0.8rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .use-my-location-btn:hover {
+          background-color: rgba(56, 189, 248, 0.18);
+        }
+
+        .dropdown-section-label {
+          font-size: 0.7rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          color: var(--text-muted);
+          margin: 10px 0 6px;
+        }
+
+        .dropdown-suggestions-list {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          max-height: 200px;
+          overflow-y: auto;
+        }
+        .dropdown-suggestion-item {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 8px 10px;
+          border-radius: 10px;
+          cursor: pointer;
+          transition: all 0.2s;
+          background-color: rgba(255, 255, 255, 0.02);
+        }
+        .dropdown-suggestion-item:hover {
+          background-color: var(--bg-surface-hover);
+          border-color: var(--border-color-active);
+        }
+        .pin-suggest {
+          color: var(--primary);
+          flex-shrink: 0;
+        }
+        .suggest-info {
+          display: flex;
+          flex-direction: column;
+          flex-grow: 1;
+          overflow: hidden;
+        }
+        .suggest-name {
+          font-size: 0.85rem;
+          font-weight: 600;
+          color: var(--text-main);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .suggest-details {
+          font-size: 0.72rem;
+          color: var(--text-muted);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .india-badge {
+          font-size: 0.65rem;
+          padding: 2px 6px;
+          border-radius: 6px;
+          background-color: rgba(245, 158, 11, 0.15);
+          color: #f59e0b;
+          font-weight: 600;
+          flex-shrink: 0;
+        }
+
+        .recent-tags-row {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+        }
+        .recent-tag-btn {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          padding: 4px 8px;
+          border-radius: 6px;
+          background-color: rgba(255, 255, 255, 0.04);
+          border: 1px solid var(--border-color);
+          font-size: 0.75rem;
+          color: var(--text-main);
+          cursor: pointer;
+        }
+        .recent-tag-btn:hover {
+          background-color: var(--bg-surface-hover);
+          color: var(--primary);
+        }
+
+        .dropdown-divider {
+          height: 1px;
+          background-color: var(--border-color);
+          margin: 10px 0;
         }
         
         .message-stream-container {
@@ -702,7 +1642,7 @@ export default function ChatArea({
         /* Welcome Dashboard styling */
         .welcome-container {
           max-width: 720px;
-          margin: 4rem auto 0;
+          margin: 3rem auto 0;
           text-align: center;
           position: relative;
           display: flex;
@@ -715,34 +1655,38 @@ export default function ChatArea({
           position: absolute;
           width: 300px;
           height: 300px;
-          background: radial-gradient(circle, rgba(139, 92, 246, 0.15) 0%, transparent 70%);
+          background: radial-gradient(circle, rgba(139, 92, 246, 0.18) 0%, transparent 70%);
           top: -100px;
           z-index: 0;
           pointer-events: none;
         }
         
         .welcome-logo {
-          width: 68px;
-          height: 68px;
-          border-radius: 20px;
-          background: linear-gradient(135deg, var(--primary), #a78bfa);
+          width: 72px;
+          height: 72px;
+          border-radius: 22px;
+          background: linear-gradient(135deg, var(--primary), #38bdf8);
           display: flex;
           align-items: center;
           justify-content: center;
           color: white;
-          margin-bottom: 1.5rem;
-          box-shadow: 0 8px 30px rgba(139, 92, 246, 0.3);
+          margin-bottom: 1.25rem;
+          box-shadow: 0 8px 30px rgba(56, 189, 248, 0.3);
           z-index: 1;
         }
-        .logo-sparkle {
-          animation: spin 10s infinite linear;
+        .logo-weather {
+          animation: float 4s ease-in-out infinite;
+        }
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-6px); }
         }
         
         .welcome-title {
           font-size: 2.2rem;
           font-weight: 700;
           margin-bottom: 0.5rem;
-          background: linear-gradient(to right, var(--text-main), #a78bfa);
+          background: linear-gradient(to right, var(--text-main), #38bdf8);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           z-index: 1;
@@ -751,10 +1695,13 @@ export default function ChatArea({
         .welcome-subtitle {
           color: var(--text-muted);
           font-size: 1rem;
-          max-width: 500px;
-          margin-bottom: 3rem;
+          max-width: 560px;
+          margin-bottom: 2.5rem;
           line-height: 1.5;
           z-index: 1;
+        }
+        .highlight-city {
+          color: var(--primary);
         }
         
         .suggestions-grid {
@@ -790,10 +1737,10 @@ export default function ChatArea({
           height: 28px;
           border-radius: 8px;
         }
-        .suggest-icon.sparkle { background-color: rgba(245, 158, 11, 0.1); color: #f59e0b; }
-        .suggest-icon.code { background-color: rgba(16, 185, 129, 0.1); color: #10b981; }
-        .suggest-icon.table { background-color: rgba(6, 182, 212, 0.1); color: #06b6d4; }
-        .suggest-icon.message { background-color: rgba(139, 92, 246, 0.1); color: #8b5cf6; }
+        .suggest-icon.sparkle { background-color: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+        .suggest-icon.code { background-color: rgba(56, 189, 248, 0.15); color: #38bdf8; }
+        .suggest-icon.table { background-color: rgba(16, 185, 129, 0.15); color: #10b981; }
+        .suggest-icon.message { background-color: rgba(139, 92, 246, 0.15); color: #8b5cf6; }
         
         .suggestion-text {
           font-size: 0.85rem;
@@ -867,7 +1814,7 @@ export default function ChatArea({
         }
         
         .input-disclaimer {
-          font-size: 0.7rem;
+          font-size: 0.72rem;
           color: var(--text-muted);
           text-align: center;
         }
@@ -877,85 +1824,36 @@ export default function ChatArea({
             height: 52px;
             padding: 0 0.75rem;
           }
-          .header-left {
-            gap: 8px;
-          }
-          .header-title-container {
-            gap: 6px;
-          }
           .header-title {
             font-size: 0.85rem;
             max-width: 110px;
           }
-          .header-badge {
-            font-size: 0.6rem;
-            padding: 1px 6px;
+          .active-city-bar {
+            padding: 6px 0.75rem;
+            gap: 8px;
           }
-          .model-dropdown-select {
-            padding: 5px 8px;
-            font-size: 0.75rem;
-            border-radius: 8px;
+          .current-grid {
+            grid-template-columns: repeat(2, 1fr);
           }
-          .settings-trigger-btn {
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
+          .forecast-cards-row {
+            grid-template-columns: repeat(4, 1fr);
           }
-          .menu-btn {
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
+          .city-dropdown-menu {
+            width: calc(100vw - 1.5rem);
+            left: 0.75rem;
           }
           .welcome-title {
             font-size: 1.6rem;
-          }
-          .welcome-subtitle {
-            font-size: 0.85rem;
-            margin-bottom: 2rem;
           }
           .suggestions-grid {
             grid-template-columns: 1fr;
             gap: 8px;
           }
-          .suggestion-card {
-            padding: 1rem;
-          }
-          .message-stream-container {
-            padding: 1rem 0.75rem;
-          }
           .chat-input-container {
             padding: 0 0.5rem 0.5rem;
-            gap: 6px;
-          }
-          .input-box-wrapper {
-            padding: 6px 10px;
-            border-radius: 24px;
-            gap: 6px;
-            background-color: rgba(22, 28, 45, 0.7);
-          }
-          .chat-textarea {
-            font-size: 16px; /* Prevents auto-zoom on iOS */
-            padding: 6px 2px;
-          }
-          .send-btn, .mic-btn, .lang-toggle-btn {
-            width: 34px;
-            height: 34px;
-            border-radius: 10px;
-          }
-          .lang-toggle-btn span {
-            display: none; /* Hide 'EN' / 'தமிழ்' text on mobile to save space */
-          }
-          .lang-toggle-btn {
-            padding: 0;
-            width: 34px;
-            height: 34px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
           }
         }
 
-        /* Voice assistant custom styles */
         .mic-btn, .lang-toggle-btn {
           width: 36px;
           height: 36px;
@@ -990,10 +1888,6 @@ export default function ChatArea({
           opacity: 0.4;
           cursor: not-allowed;
           background-color: rgba(255, 255, 255, 0.01) !important;
-          color: var(--text-muted) !important;
-        }
-        body.light-mode .mic-btn.disabled {
-          background-color: rgba(0, 0, 0, 0.01) !important;
         }
 
         .lang-toggle-btn {
@@ -1032,26 +1926,12 @@ export default function ChatArea({
           border: 1px solid rgba(239, 68, 68, 0.2);
           background-color: rgba(239, 68, 68, 0.05);
         }
-        .stop-speaking-btn:hover {
-          background-color: rgba(239, 68, 68, 0.1);
-          transform: translateY(-1px);
-          box-shadow: 0 4px 10px rgba(239, 68, 68, 0.1);
-        }
 
         .mic-btn.processing {
           color: #ffffff;
           background-color: var(--primary);
           box-shadow: 0 0 12px var(--primary-glow);
           animation: spin 2s infinite linear;
-        }
-        .textarea-processing {
-          color: var(--text-muted) !important;
-          font-style: italic;
-        }
-
-        .voice-error-text {
-          color: #f59e0b !important;
-          font-weight: 500;
         }
 
         .paperclip-btn {
@@ -1066,19 +1946,9 @@ export default function ChatArea({
           transition: all 0.2s ease;
           flex-shrink: 0;
         }
-        body.light-mode .paperclip-btn {
-          background-color: rgba(0, 0, 0, 0.02);
-        }
         .paperclip-btn:hover:not(:disabled) {
           color: var(--text-main);
           background-color: rgba(255, 255, 255, 0.05);
-        }
-        body.light-mode .paperclip-btn:hover:not(:disabled) {
-          background-color: rgba(0, 0, 0, 0.05);
-        }
-        .paperclip-btn:disabled {
-          opacity: 0.4;
-          cursor: not-allowed;
         }
 
         .attachment-preview {
@@ -1091,7 +1961,6 @@ export default function ChatArea({
           border: 1px solid var(--border-color);
           margin-bottom: 8px;
           backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
         }
         body.light-mode .attachment-preview {
           background-color: rgba(255, 255, 255, 0.8);
@@ -1116,11 +1985,6 @@ export default function ChatArea({
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
-        }
-        @media (max-width: 480px) {
-          .attachment-name {
-            max-width: 160px;
-          }
         }
 
         .attachment-status {
@@ -1161,10 +2025,6 @@ export default function ChatArea({
           align-items: center;
           justify-content: center;
           flex-shrink: 0;
-          background-color: rgba(255, 255, 255, 0.05);
-        }
-        body.light-mode .image-preview-thumbnail-wrapper {
-          background-color: rgba(0, 0, 0, 0.05);
         }
         .image-preview-thumbnail {
           width: 100%;

@@ -49,13 +49,12 @@ function Login() {
   return (
     <div className="karthikai-auth-container">
       <div className="karthikai-glass-panel">
-
         {/* KarthikAI Logo */}
-<img
-  src="/karthikai-logo.png"
-  alt="KarthikAI Logo"
-  className="karthikai-login-logo"
-/>
+        <img
+          src="/karthikai-logo.png"
+          alt="KarthikAI Logo"
+          className="karthikai-login-logo"
+        />
 
         <h1 className="karthikai-title">KarthikAI</h1>
 
@@ -66,10 +65,8 @@ function Login() {
         </p>
 
         <form className="karthikai-form" onSubmit={handleSubmit}>
-
           <div className="input-group">
             <label>Email Address</label>
-
             <input
               type="email"
               placeholder="Enter your email"
@@ -81,7 +78,6 @@ function Login() {
 
           <div className="input-group">
             <label>Password</label>
-
             <input
               type="password"
               placeholder="Enter your password"
@@ -102,7 +98,6 @@ function Login() {
               ? "Create Account"
               : "Login"}
           </button>
-
         </form>
 
         {message && (
@@ -115,7 +110,6 @@ function Login() {
           {isSignup
             ? "Already have an account?"
             : "Don't have an account?"}
-
           <button
             type="button"
             className="switch-button"
@@ -129,7 +123,6 @@ function Login() {
             {isSignup ? "Login" : "Sign Up"}
           </button>
         </div>
-
       </div>
     </div>
   );

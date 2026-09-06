@@ -4,62 +4,64 @@ import ChatArea from "./components/ChatArea";
 import SettingsModal from "./components/SettingsModal";
 import { PanelLeft } from "lucide-react";
 
-
 import Login from "./components/Login";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "./firebase";
-import { signOut } from "firebase/auth";
 
-
-const API_BASE = "https://ai-chat-bot-jzug.onrender.com";
-const BACKEND_URL = `${API_BASE}/api/chat`;
-const HISTORY_URL = `${API_BASE}/api/history`;
-const SETTINGS_URL = `${API_BASE}/api/settings`;
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const BACKEND_URL = `${API_BASE}/api/v1/chat`;
+const HISTORY_URL = `${API_BASE}/api/v1/history`;
+const SETTINGS_URL = `${API_BASE}/api/v1/settings`;
 
 export default function App() {
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
   const handleLogout = async () => {
-  try {
-    await signOut(auth);
-  } catch (error) {
-    console.error("Logout failed:", error);
-  }
-};
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setAuthLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   const [conversations, setConversations] = useState(() => {
     const saved = localStorage.getItem("ai_chatbot_conversations");
     return saved ? JSON.parse(saved) : [];
   });
 
-      const [user, setUser] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
-
-  useEffect(() => {
-  const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-    setUser(currentUser);
-    setAuthLoading(false);
+  // Active City state for WeatherGPT
+  const [activeCity, setActiveCity] = useState(() => {
+    return localStorage.getItem("weathergpt_active_city") || "Chennai";
   });
 
-  return () => unsubscribe();
-}, []);
-  
-  
   const [currentConversationId, setCurrentConversationId] = useState(() => {
     return localStorage.getItem("ai_chatbot_current_id") || null;
   });
-  
+
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem("ai_chatbot_theme") || "dark";
   });
-  
+
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // AI Model States
-  const [selectedModel, setSelectedModel] = useState("gemini");
+  // AI Model States (Default to Groq or Gemini)
+  const [selectedModel, setSelectedModel] = useState("groq");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settings, setSettings] = useState({
-    defaultModel: "gemini",
-    apiKeys: { gemini: "", openai: "", claude: "" }
+    defaultModel: "groq",
+    apiKeys: { gemini: "", groq: "", openai: "", claude: "" }
   });
 
   // Fetch Settings from backend
@@ -69,7 +71,9 @@ export default function App() {
       if (response.ok) {
         const data = await response.json();
         setSettings(data);
-        setSelectedModel(data.defaultModel || "gemini");
+        if (data.defaultModel) {
+          setSelectedModel(data.defaultModel);
+        }
       }
     } catch (err) {
       console.warn("Could not load settings from backend.", err);
@@ -78,15 +82,6 @@ export default function App() {
 
   useEffect(() => {
     fetchSettings();
-  }, []);
-  
-    useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setAuthLoading(false);
-    });
-
-    return () => unsubscribe();
   }, []);
 
   const handleSaveSettings = async (newSettings) => {
@@ -133,6 +128,13 @@ export default function App() {
     }
   }, [currentConversationId]);
 
+  // Sync active city to localStorage
+  useEffect(() => {
+    if (activeCity) {
+      localStorage.setItem("weathergpt_active_city", activeCity);
+    }
+  }, [activeCity]);
+
   // Toggle Dark/Light mode body class
   useEffect(() => {
     if (theme === "light") {
@@ -175,12 +177,23 @@ export default function App() {
   // Get active conversation details
   const activeConversation = conversations.find(c => c.id === currentConversationId) || null;
 
-const speakText = (text) => {
-  const speech = new SpeechSynthesisUtterance(text);
-  speech.lang = "en-IN";
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(speech);
-};
+  const speakText = (text) => {
+    if (!window.speechSynthesis) return;
+    const cleanText = (text || "").replace(/[*#_`>]/g, "").trim();
+    const speech = new SpeechSynthesisUtterance(cleanText);
+    speech.lang = "en-IN";
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(speech);
+  };
+
+  // Handle city change from UI
+  const handleCityChange = (newCity) => {
+    if (!newCity || typeof newCity !== "string") return;
+    const cleanCity = newCity.trim();
+    if (cleanCity) {
+      setActiveCity(cleanCity);
+    }
+  };
 
   // Handle sending a new message
   const handleSendMessage = async (text, attachment) => {
@@ -204,7 +217,7 @@ const speakText = (text) => {
     let updatedConversations = [...conversations];
     let newConv = null;
 
-    // 1. If we are starting a brand new chat (no active ID or conversation not found in history)
+    // 1. If starting a brand new chat
     if (!targetConvId || !conversations.some(c => c.id === targetConvId)) {
       targetConvId = Date.now().toString();
       setCurrentConversationId(targetConvId);
@@ -247,21 +260,17 @@ const speakText = (text) => {
         content: m.content
       }));
 
-      // Construct prompt based on model capabilities
       let promptMessage = text;
       let payloadAttachment = null;
 
       if (attachment) {
         const isImage = attachment.mimeType?.startsWith("image/");
-        
         if (isImage) {
-          // Send image payload to the backend for all models (multimodal vision)
           payloadAttachment = {
             data: attachment.data,
             mimeType: attachment.mimeType
           };
         } else {
-          // It's a PDF: Send raw payload to Gemini, fallback context text to others
           if (selectedModel === "gemini") {
             payloadAttachment = {
               data: attachment.data,
@@ -280,7 +289,9 @@ const speakText = (text) => {
         },
         body: JSON.stringify({
           message: promptMessage,
+          city: activeCity,
           history: apiHistory,
+          session_id: targetConvId,
           model: selectedModel,
           attachment: payloadAttachment
         })
@@ -291,6 +302,12 @@ const speakText = (text) => {
       }
 
       const data = await response.json();
+      
+      // If backend resolved a different active city (e.g. user asked "What about Mumbai?"), update active city
+      if (data.city && data.city !== activeCity) {
+        setActiveCity(data.city);
+      }
+
       speakText(data.response);
       
       const aiMessage = {
@@ -317,7 +334,7 @@ const speakText = (text) => {
       const errorMessage = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: `⚠️ **Connection Error**\n\nFailed to connect to the backend server at \`${BACKEND_URL}\`.\n\nPlease verify that:\n1. The backend server is running (\`npm run dev\` inside the \`backend\` folder).\n2. Your firewall or port configuration is correct.\n\n*Note: Since the backend is unreachable, live responses cannot be generated.*`,
+        content: `⚠️ **Connection Error**\n\nFailed to connect to the backend server at \`${BACKEND_URL}\`.\n\nPlease verify that the backend server is running (\`npm run dev\` or \`npm start\` in \`backend\`).`,
         timestamp: new Date().toISOString()
       };
 
@@ -340,7 +357,7 @@ const speakText = (text) => {
   const handleSelectConversation = (id) => {
     if (window.speechSynthesis) window.speechSynthesis.cancel();
     setCurrentConversationId(id);
-    setIsMobileSidebarOpen(false); // Close mobile menu when selecting
+    setIsMobileSidebarOpen(false);
   };
 
   // Delete conversation
@@ -382,8 +399,12 @@ const speakText = (text) => {
     }
   };
 
-    if (authLoading) {
-    return <div>Loading...</div>;
+  if (authLoading) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", color: "var(--text-main)" }}>
+        Loading WeatherGPT...
+      </div>
+    );
   }
 
   if (!user) {
@@ -392,7 +413,7 @@ const speakText = (text) => {
 
   return (
     <div className="app-container">
-      {/* Sidebar - render if not collapsed on desktop, and handle mobile layout */}
+      {/* Sidebar */}
       <Sidebar
         conversations={conversations}
         currentConversationId={currentConversationId}
@@ -428,7 +449,6 @@ const speakText = (text) => {
         onSendMessage={handleSendMessage}
         isLoading={isLoading}
         onToggleSidebar={() => {
-          // On mobile, toggle mobile drawer, on desktop toggle folding
           if (window.innerWidth <= 768) {
             setIsMobileSidebarOpen(!isMobileSidebarOpen);
           } else {
@@ -439,6 +459,8 @@ const speakText = (text) => {
         activeModel={selectedModel}
         onChangeModel={setSelectedModel}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        activeCity={activeCity}
+        onCityChange={handleCityChange}
       />
 
       {/* Glassmorphic Settings Modal */}
@@ -470,7 +492,6 @@ const speakText = (text) => {
           background-color: var(--bg-surface-hover);
         }
         
-        /* Adjust layout when sidebar is collapsed on desktop */
         .desktop-only {
           display: flex;
         }
@@ -483,7 +504,6 @@ const speakText = (text) => {
             margin-left: 0;
           }
           
-          /* Hide mobile hamburger toggle on desktop when sidebar is open */
           .menu-btn {
             display: ${isSidebarCollapsed ? "flex" : "none"} !important;
           }

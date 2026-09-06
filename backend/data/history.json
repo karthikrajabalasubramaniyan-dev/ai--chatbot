@@ -1,74 +1,42 @@
 [
   {
-    "id": "1781332199720",
-    "title": "hi",
+    "id": "1788686735885",
+    "title": "What is the weather in Delhi r...",
     "messages": [
       {
-        "id": "1781332199715",
+        "id": "1788686735884",
         "role": "user",
-        "content": "hi",
-        "timestamp": "2026-06-13T06:29:59.717Z"
+        "content": "What is the weather in Delhi right now?",
+        "timestamp": "2026-09-06T09:25:35.885Z"
       },
       {
-        "id": "1781332199996",
+        "id": "1788686739311",
+        "role": "assistant",
+        "content": "It’s currently **overcast** in Delhi with a **32 °C** temperature that feels like **35 °C**. The humidity is at **53 %**, wind is light at **10 km/h**, and the barometric pressure sits at **1005 hPa**. There’s no rain so far (0 mm), but the chance of a shower today is **38 %**. The UV index is modest at **2.5**.\n\n**Practical tip:** With the heat and a 38 % rain chance, it’s a good idea to stay hydrated and maybe keep a light umbrella handy just in case the skies open up. Enjoy your day!",
+        "timestamp": "2026-09-06T09:25:39.310Z"
+      }
+    ],
+    "createdAt": "2026-09-06T09:25:35.885Z",
+    "updatedAt": "2026-09-06T09:25:39.325Z"
+  },
+  {
+    "id": "1788625695367",
+    "title": "hio",
+    "messages": [
+      {
+        "id": "1788625695367",
+        "role": "user",
+        "content": "hio",
+        "timestamp": "2026-09-05T16:28:15.367Z"
+      },
+      {
+        "id": "1788625696343",
         "role": "assistant",
         "content": "⚠️ **Connection Error**\n\nFailed to connect to the backend server at `http://localhost:5000/api/chat`.\n\nPlease verify that:\n1. The backend server is running (`npm run dev` inside the `backend` folder).\n2. Your firewall or port configuration is correct.\n\n*Note: Since the backend is unreachable, live responses cannot be generated.*",
-        "timestamp": "2026-06-13T06:29:59.995Z"
+        "timestamp": "2026-09-05T16:28:16.342Z"
       }
     ],
-    "createdAt": "2026-06-13T06:29:59.720Z",
-    "updatedAt": "2026-06-13T06:30:00.783Z"
-  },
-  {
-    "id": "1781327616621",
-    "title": "hi",
-    "messages": [
-      {
-        "id": "1781327616621",
-        "role": "user",
-        "content": "hi",
-        "timestamp": "2026-06-13T05:13:36.621Z"
-      },
-      {
-        "id": "1781327618670",
-        "role": "assistant",
-        "content": "Hi there! How can I help you today?",
-        "timestamp": "2026-06-13T05:13:38.669Z"
-      },
-      {
-        "id": "1781327787076",
-        "role": "user",
-        "content": "What is AI?",
-        "timestamp": "2026-06-13T05:16:27.076Z"
-      },
-      {
-        "id": "1781327800120",
-        "role": "assistant",
-        "content": "AI stands for **Artificial Intelligence**.\n\nAt its core, AI is a broad field of computer science that aims to create machines that can perform tasks that typically require human intelligence. This includes things like:\n\n*   **Learning:** Acquiring information and rules for using the information.\n*   **Reasoning:** Using rules to reach approximate or definite conclusions.\n*   **Problem-solving:** Finding solutions to complex problems.\n*   **Perception:** Understanding and interpreting visual or auditory input (like recognizing objects in an image or understanding spoken words).\n*   **Language understanding:** Comprehending and generating human language.\n*   **Decision-making:** Choosing the best course of action from various options.\n\n**How Does AI Work (in simple terms)?**\n\nModern AI often works by:\n\n1.  **Training on Data:** AI models are fed vast amounts of data (e.g., images, text, numbers).\n2.  **Pattern Recognition:** Through algorithms, the AI identifies patterns and relationships within that data.\n3.  **Learning:** It \"learns\" from these patterns without being explicitly programmed for every possible scenario.\n4.  **Making Predictions/Decisions:** Once trained, it can apply what it has learned to new, unseen data to make predictions, perform classifications, or take actions.\n\n**Key Subfields and Concepts within AI:**\n\n*   **Machine Learning (ML):** This is the most common approach to AI today. Instead of being explicitly programmed, machines \"learn\" from data. They use statistical techniques to enable computer systems to \"learn\" from data.\n    *   *Example:* A spam filter learns to identify spam by analyzing thousands of emails marked as spam vs. not spam.\n*   **Deep Learning (DL):** A subfield of Machine Learning that uses artificial neural networks with many layers (hence \"deep\"). These networks are inspired by the structure and function of the human brain.\n    *   *Example:* Deep learning powers facial recognition, self-driving cars, and highly accurate language translation.\n*   **Natural Language Processing (NLP):** Enables computers to understand, interpret, and generate human language.\n    *   *Example:* Voice assistants (Siri, Alexa), chatbots, sentiment analysis.\n*   **Computer Vision:** Enables computers to \"see\" and interpret visual information from images and videos.\n    *   *Example:* Object detection, medical image analysis, facial recognition.\n*   **Robotics:** While robotics is about building and operating robots, AI often provides the \"intelligence\" that allows robots to perceive, navigate, and make decisions in complex environments.\n\n**Types/Levels of AI:**\n\nIt's important to distinguish between what we have today and what is currently hypothetical:\n\n1.  **Narrow AI (Artificial Narrow Intelligence - ANI):** This is the **only type of AI that exists today.** It's designed and trained for a specific task or a narrow range of tasks.\n    *   *Examples:* Recommender systems (Netflix, Amazon), voice assistants, self-driving cars, medical diagnostic tools, spam filters, chess-playing computers. They can be incredibly good at their specific task but lack general understanding.\n2.  **General AI (Artificial General Intelligence - AGI):** This is **hypothetical AI** that would possess the ability to understand, learn, and apply intelligence across a wide range of tasks, just like a human. It would be able to perform any intellectual task that a human being can. We are not there yet.\n3.  **Super AI (Artificial Super Intelligence - ASI):** This is **purely speculative AI** that would far surpass human intelligence in virtually every field, including scientific creativity, general wisdom, and social skills. This is the realm of science fiction.\n\nIn summary, AI is about empowering machines to think, learn, and solve problems in ways that emulate or even exceed human capabilities, with the goal of automating tasks, discovering new insights, and improving human lives.",
-        "timestamp": "2026-06-13T05:16:40.119Z"
-      }
-    ],
-    "createdAt": "2026-06-13T05:13:36.621Z",
-    "updatedAt": "2026-06-13T05:16:40.124Z"
-  },
-  {
-    "id": "1781198356453",
-    "title": "Create a comparison table comp...",
-    "messages": [
-      {
-        "id": "1781198356453",
-        "role": "user",
-        "content": "Create a comparison table comparing REST APIs and WebSockets based on features, protocols, and use cases.",
-        "timestamp": "2026-06-11T17:19:16.453Z"
-      },
-      {
-        "id": "1781198372070",
-        "role": "assistant",
-        "content": "This comparison table details the key differences between REST APIs and WebSockets, highlighting their distinct features, underlying protocols, and ideal use cases.\n\n---\n\n## REST APIs vs. WebSockets Comparison Table\n\n| Feature/Aspect        | REST APIs                                             | WebSockets                                                 |\n| :-------------------- | :---------------------------------------------------- | :--------------------------------------------------------- |\n| **I. Core Features**                                                                                                                              |\n| **Communication Pattern** | **Request-Response (Pull-based):** Client initiates a request, server sends a response. Client must poll for updates. | **Event-Driven (Push-based):** Both client and server can send messages independently over a persistent connection. Server can push updates to the client. |\n| **Connection Type**   | **Short-lived, Stateless:** Each request is independent and typically closes the connection after the response. No session state maintained on the server between requests. | **Long-lived, Stateful:** Establishes a single, persistent connection that remains open until explicitly closed or broken. Session state can be maintained. |\n| **Data Flow**         | **Half-duplex/Unidirectional:** Data flows in one direction at a time (request then response). | **Full-duplex/Bi-directional:** Data can flow simultaneously in both directions over the same connection. |\n| **Overhead**          | **Higher per-request overhead:** Each request includes full HTTP headers (e.g., authentication, cookies, content-type). | **Lower per-message overhead (after handshake):** Initial HTTP handshake has overhead, but subsequent messages have minimal framing overhead. |\n| **Real-time Capability** | **Limited/Requires Polling:** Not inherently real-time. Achieved through frequent polling (which is inefficient) or Server-Sent Events (SSE). | **Designed for Real-time:** Enables instant, low-latency communication ideal for dynamic updates. |\n| **Latency**           | **Higher:** Due to repeated connection setup, tear-down, and full header parsing for each request. | **Lower:** After initial handshake, messages are sent over an open connection with minimal processing time. |\n| **Scalability**       | **Easier to scale horizontally:** Stateless nature makes load balancing straightforward; any server can handle any request. | **More complex to scale horizontally:** Stateful connections require sticky sessions or a message broker (e.g., Redis Pub/Sub) to manage state across multiple servers. |\n| **Caching**           | **Excellent Caching Support:** HTTP caching mechanisms (ETags, Cache-Control) are powerful and widely supported. | **No Native Caching:** Data stream is transient; caching must be implemented at the application layer. |\n| **Error Handling**    | **Standardized HTTP Status Codes:** Clear, well-defined error codes (4xx for client errors, 5xx for server errors). | **Less Standardized:** Error handling is often application-specific; connection closure is the primary way to signal an error. |\n| **Simplicity**        | Generally simpler to implement for basic CRUD operations and data retrieval. | More complex to implement due to managing persistent connections, state, and potential reconnection logic. |\n| **Security**          | Inherits HTTP/HTTPS security (TLS encryption, authentication via headers). | Inherits HTTP handshake security (`wss://` for TLS encryption), authentication handled during handshake or via messaging. |\n| **Message Ordering**  | Each request/response pair is independent. | Messages sent over a single WebSocket connection are typically ordered. |\n| **Browser Support**   | Universal.                                            | Universal in modern browsers.                              |\n| **Mobile App Support** | Universal.                                            | Universal.                                                 |\n| **Firewall/Proxy**    | Generally well-supported, standard HTTP ports (80/443). | Can sometimes be an issue if proxies don't support WebSocket upgrade or maintain long-lived connections. |\n| **II. Protocols**                                                                                                                                |\n| **Primary Protocol**  | **HTTP/1.1, HTTP/2, HTTP/3** (over TCP or UDP for HTTP/3). | **WebSocket Protocol (RFC 6455)**, layered over TCP.      |\n| **Initial Handshake** | Not applicable; each request is direct HTTP.          | **HTTP Upgrade Handshake:** Starts as an HTTP request (GET with \"Upgrade: websocket\" header) to establish the connection. |\n| **Port**              | Typically 80 (HTTP) or 443 (HTTPS).                   | Typically 80 (ws://) or 443 (wss://) via HTTP upgrade.    |\n| **Data Format**       | Flexible (JSON, XML, plain text, URL-encoded forms).  | Flexible (text frames like JSON/XML, binary frames).       |\n| **III. Use Cases**                                                                                                                                |\n| **Ideal Use Cases**   | - **CRUD operations:** Creating, reading, updating, deleting resources (e.g., blog posts, user profiles).<br>- **Retrieving static/infrequently updated data:** Weather forecasts, product listings.<br>- **Traditional web applications:** Most websites and mobile apps.<br>- **Microservices communication:** Often used for internal service-to-service communication.<br>- **Exposing APIs to third parties:** Standard and easy to consume. | - **Real-time chat applications:** Instant messaging.<br>- **Live dashboards/analytics:** Stock tickers, sports scores, system monitoring.<br>- **Multiplayer online gaming:** Low-latency interaction.<br>- **Collaborative editing:** Google Docs style.<br>- **Push notifications:** Instant alerts.<br>- **IoT device communication:** Sending and receiving commands/data.<br>- **Location-based services:** Real-time tracking. |\n| **Not Ideal For**     | - Real-time updates (without polling).<br>- High-frequency, small message exchanges. | - Simple, one-off data retrieval.<br>- Highly cacheable content.<br>- Applications where client only needs to pull data occasionally. |\n\n---\n\n### When to Choose Which:\n\n*   **Choose REST APIs** when you need:\n    *   A standardized, stateless, request-response communication model.\n    *   Excellent caching capabilities.\n    *   Easy horizontal scalability.\n    *   To expose a well-defined API for external consumption.\n    *   To perform CRUD operations on resources where real-time updates are not critical.\n\n*   **Choose WebSockets** when you need:\n    *   Real-time, low-latency, bi-directional communication.\n    *   To push updates from the server to the client without the client polling.\n    *   A persistent connection for frequent, small message exchanges.\n    *   Applications like chat, gaming, live dashboards, or collaborative tools.",
-        "timestamp": "2026-06-11T17:19:32.069Z"
-      }
-    ],
-    "createdAt": "2026-06-11T17:19:16.454Z",
-    "updatedAt": "2026-06-11T17:19:32.081Z"
+    "createdAt": "2026-09-05T16:28:15.367Z",
+    "updatedAt": "2026-09-05T16:28:16.346Z"
   }
 ]

@@ -6,11 +6,13 @@ export default function SettingsModal({ isOpen, onClose, settings, onSave }) {
   const [geminiKey, setGeminiKey] = useState("");
   const [openaiKey, setOpenaiKey] = useState("");
   const [claudeKey, setClaudeKey] = useState("");
+  const [groqKey, setGroqKey] = useState("");
 
   const [showKeys, setShowKeys] = useState({
     gemini: false,
     openai: false,
     claude: false,
+    groq: false,
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -23,6 +25,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSave }) {
       setGeminiKey(settings.apiKeys?.gemini || "");
       setOpenaiKey(settings.apiKeys?.openai || "");
       setClaudeKey(settings.apiKeys?.claude || "");
+      setGroqKey(settings.apiKeys?.groq || "");
       setSaveSuccess(false);
     }
   }, [isOpen, settings]);
@@ -46,6 +49,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSave }) {
           gemini: geminiKey,
           openai: openaiKey,
           claude: claudeKey,
+          groq: groqKey,
         },
       });
       setSaveSuccess(true);
@@ -93,6 +97,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSave }) {
               className="settings-select"
             >
               <option value="gemini">Gemini 2.5 Flash (Default)</option>
+              <option value="groq">Groq GPT-OSS 20B</option>
               <option value="openai">OpenAI GPT-4o-mini</option>
               <option value="claude">Anthropic Claude 3.5 Sonnet</option>
             </select>
@@ -134,6 +139,36 @@ export default function SettingsModal({ isOpen, onClose, settings, onSave }) {
                 title={showKeys.gemini ? "Hide Key" : "Show Key"}
               >
                 {showKeys.gemini ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
+
+          {/* Groq API Key */}
+          <div className="form-group">
+            <div className="label-with-icon">
+              <Key size={14} className="key-field-icon groq-color" />
+              <label htmlFor="groq-key-input" className="form-label">
+                Groq API Key
+              </label>
+            </div>
+            <div className="input-with-action">
+              <input
+                id="groq-key-input"
+                type={showKeys.groq ? "text" : "password"}
+                placeholder={
+                  groqKey ? "••••••••••••••••" : "Enter Groq API Key (gsk_...)"
+                }
+                value={groqKey}
+                onChange={(e) => setGroqKey(e.target.value)}
+                className="settings-input"
+              />
+              <button
+                type="button"
+                className="input-action-btn"
+                onClick={() => handleToggleShow("groq")}
+                title={showKeys.groq ? "Hide Key" : "Show Key"}
+              >
+                {showKeys.groq ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
           </div>
@@ -399,6 +434,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSave }) {
           opacity: 0.7;
         }
         .gemini-color { color: var(--primary); }
+        .groq-color { color: #f97316; }
         .openai-color { color: #10b981; }
         .claude-color { color: #f59e0b; }
 
