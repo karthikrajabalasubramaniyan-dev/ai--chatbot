@@ -273,15 +273,21 @@ export default function MessageItem({ message }) {
           display: flex;
           margin-bottom: 1.5rem;
           gap: 12px;
-          max-width: 85%;
+          width: 100%;
+          max-width: 100%;
+          min-width: 0;
+          box-sizing: border-box;
         }
         .user-message-row {
           margin-left: auto;
           flex-direction: row;
           justify-content: flex-end;
+          max-width: 85%;
         }
         .ai-message-row {
           margin-right: auto;
+          max-width: 100%;
+          width: 100%;
         }
         
         .avatar {
@@ -308,9 +314,17 @@ export default function MessageItem({ message }) {
           display: flex;
           flex-direction: column;
           gap: 4px;
+          min-width: 0;
+          max-width: 100%;
+          box-sizing: border-box;
+        }
+        .ai-message-row .bubble-container {
+          flex-grow: 1;
+          max-width: calc(100% - 48px);
         }
         .user-message-row .bubble-container {
           align-items: flex-end;
+          max-width: 100%;
         }
         
         .message-bubble {
@@ -318,7 +332,10 @@ export default function MessageItem({ message }) {
           border-radius: 16px;
           position: relative;
           max-width: 100%;
+          min-width: 0;
+          box-sizing: border-box;
           word-break: break-word;
+          overflow-wrap: anywhere;
         }
         .user-bubble {
           background-color: var(--user-bubble);
@@ -333,12 +350,14 @@ export default function MessageItem({ message }) {
           background-color: var(--ai-bubble);
           border-bottom-left-radius: 2px;
           border-color: var(--border-color);
+          width: 100%;
         }
         
         .user-text {
           white-space: pre-wrap;
           font-size: 0.95rem;
           line-height: 1.5;
+          word-break: break-word;
         }
         
         .timestamp {
@@ -398,7 +417,9 @@ export default function MessageItem({ message }) {
         /* Weather Table Styling */
         .weather-table-container {
           width: 100%;
+          max-width: 100%;
           overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
           margin: 1rem 0;
           border-radius: 12px;
           border: 1px solid var(--border-color);
@@ -408,6 +429,7 @@ export default function MessageItem({ message }) {
           box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
           scrollbar-width: thin;
           scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+          box-sizing: border-box;
         }
 
         .weather-table-container::-webkit-scrollbar {
@@ -508,7 +530,14 @@ export default function MessageItem({ message }) {
 
         @media (max-width: 768px) {
           .message-row {
-            max-width: 95%;
+            margin-bottom: 1rem;
+            gap: 8px;
+          }
+          .user-message-row {
+            max-width: 85%;
+          }
+          .ai-message-row .bubble-container {
+            max-width: calc(100% - 38px);
           }
           .avatar {
             width: 30px;
@@ -520,7 +549,54 @@ export default function MessageItem({ message }) {
             height: 14px;
           }
           .message-bubble {
-            padding: 0.85rem 1rem;
+            padding: 0.75rem 0.9rem;
+            border-radius: 14px;
+          }
+          .weather-styled-table {
+            font-size: 0.8rem;
+          }
+          .weather-table-th, .weather-table-td {
+            padding: 8px 10px;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .message-row {
+            margin-bottom: 0.85rem;
+            gap: 6px;
+          }
+          .user-message-row {
+            max-width: 88%;
+          }
+          .ai-message-row .bubble-container {
+            max-width: calc(100% - 32px);
+          }
+          .avatar {
+            width: 26px;
+            height: 26px;
+            border-radius: 7px;
+          }
+          .avatar svg {
+            width: 13px;
+            height: 13px;
+          }
+          .message-bubble {
+            padding: 0.65rem 0.8rem;
+            border-radius: 12px;
+          }
+          .user-text {
+            font-size: 0.88rem;
+          }
+          .markdown-content {
+            font-size: 0.88rem;
+          }
+          .bubble-actions {
+            margin-top: 0.5rem;
+            padding-top: 0.4rem;
+          }
+          .bubble-action-btn {
+            padding: 2px 6px;
+            font-size: 0.7rem;
           }
         }
       `}} />

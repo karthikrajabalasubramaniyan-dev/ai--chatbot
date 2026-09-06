@@ -528,6 +528,9 @@ export default function App() {
           .desktop-only {
             display: none !important;
           }
+          .menu-btn {
+            display: flex !important;
+          }
         }
       `}} />
     </div>

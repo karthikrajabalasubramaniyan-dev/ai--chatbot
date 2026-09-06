@@ -66,11 +66,13 @@ body.light-mode {
 }
 
 html, body, #root {
+  width: 100%;
+  max-width: 100%;
   height: 100%;
+  overflow-x: hidden;
   font-family: var(--font-sans);
   background-color: var(--bg-app);
   color: var(--text-main);
-  overflow: hidden;
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
@@ -78,9 +80,12 @@ html, body, #root {
 .app-container {
   display: flex;
   height: 100vh;
-  width: 100vw;
+  height: 100dvh;
+  width: 100%;
+  max-width: 100%;
   overflow: hidden;
   position: relative;
+  box-sizing: border-box;
 }
 
 /* Buttons and Controls */
@@ -179,6 +184,15 @@ h1, h2, h3, h4 {
 .markdown-content {
   line-height: 1.6;
   font-size: 0.95rem;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.markdown-content img {
+  max-width: 100%;
+  height: auto;
 }
 
 .markdown-content p {
@@ -198,6 +212,7 @@ h1, h2, h3, h4 {
 .markdown-content ol {
   margin-bottom: 0.75rem;
   padding-left: 1.25rem;
+  max-width: 100%;
 }
 
 .markdown-content li {
@@ -211,6 +226,7 @@ h1, h2, h3, h4 {
   border-radius: 4px;
   background-color: rgba(255, 255, 255, 0.1);
   font-size: 0.85em;
+  word-break: break-word;
 }
 
 body.light-mode .markdown-content code {
@@ -224,6 +240,9 @@ body.light-mode .markdown-content code {
   background-color: #0b0f19;
   border: 1px solid var(--border-color);
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+  box-sizing: border-box;
   position: relative;
 }
 
@@ -238,6 +257,7 @@ body.light-mode .markdown-content pre {
   color: inherit;
   font-size: 0.9em;
   font-weight: 400;
+  white-space: pre;
 }
 
 /* Custom code block header styling */
@@ -247,6 +267,8 @@ body.light-mode .markdown-content pre {
   overflow: hidden;
   border: 1px solid var(--border-color);
   box-shadow: var(--shadow-sm);
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .code-block-header {
@@ -272,8 +294,17 @@ body.light-mode .code-block-header {
   border-radius: 0;
 }
 
+.weather-table-container {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
+}
+
 .markdown-content table {
   width: 100%;
+  max-width: 100%;
   border-collapse: collapse;
   margin: 1rem 0;
   font-size: 0.88rem;

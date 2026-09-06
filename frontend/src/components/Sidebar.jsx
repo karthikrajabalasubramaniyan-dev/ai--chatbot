@@ -70,9 +70,14 @@ export default function Sidebar({
             <span>New Chat</span>
           </button>
           
-          {/* Close Sidebar button (visible on desktop and mobile for folding) */}
+          {/* Close Sidebar button (visible on desktop) */}
           <button className="toggle-sidebar-btn desktop-only" onClick={onClose} title="Close sidebar">
             <PanelLeftClose size={18} />
+          </button>
+
+          {/* Close Sidebar button (visible on mobile drawer) */}
+          <button className="toggle-sidebar-btn mobile-only-btn" onClick={onClose} title="Close sidebar">
+            <X size={18} />
           </button>
         </div>
 
@@ -510,6 +515,10 @@ export default function Sidebar({
           color: var(--text-muted);
         }
         
+        .mobile-only-btn {
+          display: none;
+        }
+
         .sidebar-overlay {
           display: none;
         }
@@ -519,15 +528,24 @@ export default function Sidebar({
           .desktop-only {
             display: none !important;
           }
+
+          .mobile-only-btn {
+            display: flex;
+          }
           
           .sidebar {
-            position: absolute;
+            position: fixed;
             left: 0;
             top: 0;
             bottom: 0;
+            height: 100%;
+            height: 100dvh;
+            width: 280px;
+            max-width: 85vw;
+            box-sizing: border-box;
             transform: translateX(-100%);
             z-index: 100;
-            box-shadow: 10px 0 30px rgba(0, 0, 0, 0.2);
+            box-shadow: 10px 0 30px rgba(0, 0, 0, 0.4);
           }
           .sidebar.open {
             transform: translateX(0);
@@ -535,14 +553,34 @@ export default function Sidebar({
           
           .sidebar-overlay {
             display: block;
-            position: absolute;
+            position: fixed;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
             background-color: rgba(0, 0, 0, 0.6);
             backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
             z-index: 90;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .sidebar {
+            width: 260px;
+            max-width: 82vw;
+          }
+          .sidebar-header {
+            padding: 1rem 0.75rem;
+          }
+          .conversations-list-container {
+            padding: 0.25rem 0.5rem;
+          }
+          .sidebar-footer {
+            padding: 0.5rem;
           }
         }
       `}} />

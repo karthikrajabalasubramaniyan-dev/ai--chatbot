@@ -1042,14 +1042,19 @@ export default function ChatArea({
           display: flex;
           flex-direction: column;
           flex-grow: 1;
+          width: 100%;
+          max-width: 100%;
+          min-width: 0;
           height: 100%;
           position: relative;
           background: radial-gradient(circle at 50% 50%, var(--bg-app) 0%, rgba(8, 11, 17, 0.95) 100%);
           overflow: hidden;
+          box-sizing: border-box;
         }
         
         .chat-header {
           height: 60px;
+          min-height: 60px;
           display: flex;
           align-items: center;
           justify-content: space-between;
@@ -1057,23 +1062,31 @@ export default function ChatArea({
           border-bottom: 1px solid var(--border-color);
           background-color: rgba(8, 11, 17, 0.4);
           z-index: 10;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+          gap: 12px;
         }
         
         .header-left {
           display: flex;
           align-items: center;
           gap: 12px;
+          min-width: 0;
+          flex: 1 1 auto;
         }
 
         .header-right {
           display: flex;
           align-items: center;
           gap: 12px;
+          flex-shrink: 0;
         }
 
         .model-selector-wrapper {
           display: flex;
           align-items: center;
+          min-width: 0;
         }
 
         .model-dropdown-select {
@@ -1087,6 +1100,8 @@ export default function ChatArea({
           outline: none;
           cursor: pointer;
           transition: all 0.2s;
+          max-width: 220px;
+          text-overflow: ellipsis;
         }
         body.light-mode .model-dropdown-select {
           background-color: rgba(0, 0, 0, 0.02);
@@ -1114,6 +1129,7 @@ export default function ChatArea({
           background-color: rgba(255, 255, 255, 0.03);
           border: 1px solid var(--border-color);
           transition: all 0.2s;
+          flex-shrink: 0;
         }
         body.light-mode .settings-trigger-btn {
           background-color: rgba(0, 0, 0, 0.02);
@@ -1136,6 +1152,7 @@ export default function ChatArea({
           justify-content: center;
           border-radius: 8px;
           color: var(--text-muted);
+          flex-shrink: 0;
         }
         .menu-btn:hover {
           color: var(--text-main);
@@ -1149,6 +1166,7 @@ export default function ChatArea({
           display: flex;
           align-items: center;
           gap: 10px;
+          min-width: 0;
         }
         
         .header-title {
@@ -1169,6 +1187,8 @@ export default function ChatArea({
           background: rgba(16, 185, 129, 0.1);
           color: #10b981;
           border: 1px solid rgba(16, 185, 129, 0.2);
+          white-space: nowrap;
+          flex-shrink: 0;
         }
 
         /* Active City & Tabs Bar */
@@ -1183,6 +1203,9 @@ export default function ChatArea({
           z-index: 20;
           gap: 12px;
           flex-wrap: wrap;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
         }
         body.light-mode .active-city-bar {
           background-color: rgba(243, 244, 246, 0.8);
@@ -1193,6 +1216,7 @@ export default function ChatArea({
           align-items: center;
           gap: 12px;
           flex-wrap: wrap;
+          min-width: 0;
         }
 
         .city-selector-btn {
@@ -1207,6 +1231,8 @@ export default function ChatArea({
           font-size: 0.85rem;
           cursor: pointer;
           transition: all 0.2s;
+          flex-shrink: 0;
+          max-width: 100%;
         }
         .city-selector-btn:hover {
           background-color: rgba(139, 92, 246, 0.2);
@@ -1214,6 +1240,7 @@ export default function ChatArea({
         }
         .pin-icon {
           color: var(--primary);
+          flex-shrink: 0;
         }
         .active-city-label {
           color: var(--text-muted);
@@ -1230,6 +1257,7 @@ export default function ChatArea({
         .chevron-icon {
           color: var(--text-muted);
           transition: transform 0.2s;
+          flex-shrink: 0;
         }
         .chevron-icon.open {
           transform: rotate(180deg);
@@ -1243,6 +1271,7 @@ export default function ChatArea({
           padding: 2px 4px;
           border-radius: 10px;
           border: 1px solid var(--border-color);
+          flex-shrink: 0;
         }
         .weather-tab-btn {
           display: flex;
@@ -1255,6 +1284,7 @@ export default function ChatArea({
           color: var(--text-muted);
           cursor: pointer;
           transition: all 0.2s;
+          white-space: nowrap;
         }
         .weather-tab-btn:hover {
           color: var(--text-main);
@@ -1271,8 +1301,11 @@ export default function ChatArea({
           align-items: center;
           gap: 6px;
           overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
           scrollbar-width: none;
           max-width: 450px;
+          padding: 2px 0;
+          box-sizing: border-box;
         }
         .quick-city-chips::-webkit-scrollbar {
           display: none;
@@ -1287,6 +1320,7 @@ export default function ChatArea({
           cursor: pointer;
           transition: all 0.2s;
           white-space: nowrap;
+          flex-shrink: 0;
         }
         .city-chip:hover {
           background-color: rgba(255, 255, 255, 0.08);
@@ -1306,7 +1340,12 @@ export default function ChatArea({
           border-bottom: 1px solid var(--border-color);
           background-color: rgba(10, 14, 24, 0.9);
           backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
           z-index: 15;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+          overflow-x: hidden;
         }
         body.light-mode .weather-drawer-panel {
           background-color: rgba(255, 255, 255, 0.95);
@@ -1324,6 +1363,10 @@ export default function ChatArea({
           gap: 8px;
           font-size: 0.9rem;
           color: var(--text-main);
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
         .drawer-close-btn {
           width: 24px;
@@ -1333,6 +1376,7 @@ export default function ChatArea({
           align-items: center;
           justify-content: center;
           color: var(--text-muted);
+          flex-shrink: 0;
         }
         .drawer-close-btn:hover {
           color: var(--text-main);
@@ -1343,6 +1387,9 @@ export default function ChatArea({
           display: grid;
           grid-template-columns: repeat(4, 1fr);
           gap: 10px;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
         }
         .metric-card {
           padding: 0.75rem;
@@ -1352,6 +1399,8 @@ export default function ChatArea({
           display: flex;
           flex-direction: column;
           gap: 2px;
+          min-width: 0;
+          box-sizing: border-box;
         }
         .metric-label {
           font-size: 0.7rem;
@@ -1363,6 +1412,9 @@ export default function ChatArea({
           font-size: 1.1rem;
           font-weight: 700;
           color: var(--primary);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
         .metric-sub {
           font-size: 0.75rem;
@@ -1370,10 +1422,14 @@ export default function ChatArea({
         }
 
         .forecast-cards-row {
-          display: grid;
-          grid-template-columns: repeat(7, 1fr);
+          display: flex;
           gap: 8px;
           overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+          width: 100%;
+          max-width: 100%;
+          padding-bottom: 4px;
+          box-sizing: border-box;
         }
         .forecast-card {
           padding: 0.75rem 0.5rem;
@@ -1384,6 +1440,9 @@ export default function ChatArea({
           display: flex;
           flex-direction: column;
           gap: 3px;
+          flex: 1 0 85px;
+          min-width: 80px;
+          box-sizing: border-box;
         }
         .fc-day { font-size: 0.8rem; font-weight: 600; color: var(--text-main); }
         .fc-date { font-size: 0.65rem; color: var(--text-muted); }
@@ -1397,11 +1456,16 @@ export default function ChatArea({
           gap: 10px;
           margin-bottom: 0.75rem;
           flex-wrap: wrap;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
         }
         .hist-input-group {
           display: flex;
           flex-direction: column;
           gap: 4px;
+          flex: 1 1 120px;
+          min-width: 0;
         }
         .hist-input-group label {
           font-size: 0.7rem;
@@ -1416,6 +1480,8 @@ export default function ChatArea({
           color: var(--text-main);
           font-size: 0.8rem;
           outline: none;
+          width: 100%;
+          box-sizing: border-box;
         }
         body.light-mode .hist-input {
           background-color: rgba(0, 0, 0, 0.02);
@@ -1428,6 +1494,7 @@ export default function ChatArea({
           font-size: 0.8rem;
           font-weight: 600;
           cursor: pointer;
+          flex-shrink: 0;
         }
         .hist-error-text {
           font-size: 0.75rem;
@@ -1435,13 +1502,19 @@ export default function ChatArea({
           margin-bottom: 0.5rem;
         }
         .historical-table-wrapper {
-          max-height: 200px;
+          max-height: 220px;
           overflow-y: auto;
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
           border-radius: 10px;
           border: 1px solid var(--border-color);
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
         }
         .historical-table {
           width: 100%;
+          min-width: 480px;
           border-collapse: collapse;
           font-size: 0.78rem;
           text-align: left;
@@ -1449,6 +1522,7 @@ export default function ChatArea({
         .historical-table th, .historical-table td {
           padding: 6px 10px;
           border-bottom: 1px solid var(--border-color);
+          white-space: nowrap;
         }
         .historical-table th {
           background-color: rgba(255, 255, 255, 0.02);
@@ -1462,6 +1536,7 @@ export default function ChatArea({
           top: calc(100% + 4px);
           left: 1.5rem;
           width: 380px;
+          max-width: calc(100vw - 3rem);
           background-color: rgba(14, 19, 31, 0.96);
           border: 1px solid var(--border-color-active);
           border-radius: 16px;
@@ -1469,6 +1544,7 @@ export default function ChatArea({
           padding: 14px;
           backdrop-filter: blur(20px);
           z-index: 50;
+          box-sizing: border-box;
         }
         body.light-mode .city-dropdown-menu {
           background-color: rgba(255, 255, 255, 0.98);
@@ -1482,6 +1558,8 @@ export default function ChatArea({
           border: 1px solid var(--border-color);
           border-radius: 12px;
           padding: 8px 12px;
+          width: 100%;
+          box-sizing: border-box;
         }
         body.light-mode .city-search-form {
           background-color: rgba(0, 0, 0, 0.03);
@@ -1497,6 +1575,7 @@ export default function ChatArea({
           outline: none;
           color: var(--text-main);
           font-size: 0.88rem;
+          min-width: 0;
         }
         .city-search-submit-btn {
           font-size: 0.75rem;
@@ -1505,6 +1584,7 @@ export default function ChatArea({
           background-color: var(--primary);
           color: white;
           font-weight: 600;
+          flex-shrink: 0;
         }
 
         .geo-location-wrapper {
@@ -1568,6 +1648,7 @@ export default function ChatArea({
           flex-direction: column;
           flex-grow: 1;
           overflow: hidden;
+          min-width: 0;
         }
         .suggest-name {
           font-size: 0.85rem;
@@ -1625,23 +1706,32 @@ export default function ChatArea({
         .message-stream-container {
           flex-grow: 1;
           overflow-y: auto;
+          overflow-x: hidden;
           padding: 1.5rem;
           position: relative;
           scroll-behavior: smooth;
           -webkit-overflow-scrolling: touch;
+          width: 100%;
+          max-width: 100%;
+          min-width: 0;
+          box-sizing: border-box;
         }
         
         .message-list {
           max-width: 800px;
+          width: 100%;
           margin: 0 auto;
           display: flex;
           flex-direction: column;
           padding-bottom: 2rem;
+          box-sizing: border-box;
+          min-width: 0;
         }
         
         /* Welcome Dashboard styling */
         .welcome-container {
           max-width: 720px;
+          width: 100%;
           margin: 3rem auto 0;
           text-align: center;
           position: relative;
@@ -1649,12 +1739,14 @@ export default function ChatArea({
           flex-direction: column;
           align-items: center;
           padding: 0 1rem;
+          box-sizing: border-box;
         }
         
         .welcome-glow {
           position: absolute;
           width: 300px;
           height: 300px;
+          max-width: 100%;
           background: radial-gradient(circle, rgba(139, 92, 246, 0.18) 0%, transparent 70%);
           top: -100px;
           z-index: 0;
@@ -1673,6 +1765,7 @@ export default function ChatArea({
           margin-bottom: 1.25rem;
           box-shadow: 0 8px 30px rgba(56, 189, 248, 0.3);
           z-index: 1;
+          flex-shrink: 0;
         }
         .logo-weather {
           animation: float 4s ease-in-out infinite;
@@ -1690,6 +1783,7 @@ export default function ChatArea({
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           z-index: 1;
+          word-break: break-word;
         }
         
         .welcome-subtitle {
@@ -1709,7 +1803,9 @@ export default function ChatArea({
           grid-template-columns: repeat(2, 1fr);
           gap: 12px;
           width: 100%;
+          max-width: 100%;
           z-index: 1;
+          box-sizing: border-box;
         }
         
         .suggestion-card {
@@ -1720,6 +1816,7 @@ export default function ChatArea({
           background-color: var(--bg-surface);
           border-color: var(--border-color);
           transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          box-sizing: border-box;
         }
         .suggestion-card:hover {
           background-color: var(--bg-surface-hover);
@@ -1758,6 +1855,8 @@ export default function ChatArea({
           display: flex;
           flex-direction: column;
           gap: 8px;
+          box-sizing: border-box;
+          min-width: 0;
         }
         
         .input-box-wrapper {
@@ -1767,7 +1866,11 @@ export default function ChatArea({
           align-items: flex-end;
           gap: 10px;
           background-color: var(--bg-surface);
-          border-color: var(--border-color);
+          border: 1px solid var(--border-color);
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+          min-width: 0;
         }
         .input-box-wrapper:focus-within {
           border-color: var(--primary);
@@ -1786,6 +1889,7 @@ export default function ChatArea({
           padding: 8px 4px;
           resize: none;
           max-height: 200px;
+          min-width: 0;
         }
         .chat-textarea::placeholder {
           color: var(--text-muted);
@@ -1817,41 +1921,7 @@ export default function ChatArea({
           font-size: 0.72rem;
           color: var(--text-muted);
           text-align: center;
-        }
-        
-        @media (max-width: 768px) {
-          .chat-header {
-            height: 52px;
-            padding: 0 0.75rem;
-          }
-          .header-title {
-            font-size: 0.85rem;
-            max-width: 110px;
-          }
-          .active-city-bar {
-            padding: 6px 0.75rem;
-            gap: 8px;
-          }
-          .current-grid {
-            grid-template-columns: repeat(2, 1fr);
-          }
-          .forecast-cards-row {
-            grid-template-columns: repeat(4, 1fr);
-          }
-          .city-dropdown-menu {
-            width: calc(100vw - 1.5rem);
-            left: 0.75rem;
-          }
-          .welcome-title {
-            font-size: 1.6rem;
-          }
-          .suggestions-grid {
-            grid-template-columns: 1fr;
-            gap: 8px;
-          }
-          .chat-input-container {
-            padding: 0 0.5rem 0.5rem;
-          }
+          word-break: break-word;
         }
 
         .mic-btn, .lang-toggle-btn {
@@ -1961,6 +2031,8 @@ export default function ChatArea({
           border: 1px solid var(--border-color);
           margin-bottom: 8px;
           backdrop-filter: blur(12px);
+          max-width: 100%;
+          box-sizing: border-box;
         }
         body.light-mode .attachment-preview {
           background-color: rgba(255, 255, 255, 0.8);
@@ -1970,6 +2042,8 @@ export default function ChatArea({
           display: flex;
           align-items: center;
           gap: 10px;
+          min-width: 0;
+          overflow: hidden;
         }
 
         .pdf-icon {
@@ -1994,6 +2068,7 @@ export default function ChatArea({
           border-radius: 6px;
           background-color: rgba(245, 158, 11, 0.1);
           color: #f59e0b;
+          flex-shrink: 0;
         }
         .attachment-status.ready {
           background-color: rgba(16, 185, 129, 0.1);
@@ -2009,6 +2084,7 @@ export default function ChatArea({
           justify-content: center;
           color: var(--text-muted);
           transition: all 0.2s;
+          flex-shrink: 0;
         }
         .remove-attachment-btn:hover {
           color: #ef4444;
@@ -2030,6 +2106,457 @@ export default function ChatArea({
           width: 100%;
           height: 100%;
           object-fit: cover;
+        }
+        
+        /* Responsive CSS Rules for Mobile & Tablet */
+        @media (max-width: 768px) {
+          .chat-header {
+            height: 54px;
+            min-height: 54px;
+            padding: 0 0.75rem;
+            gap: 8px;
+          }
+          .header-left {
+            gap: 8px;
+          }
+          .header-title {
+            font-size: 0.9rem;
+            max-width: 140px;
+          }
+          .header-right {
+            gap: 8px;
+          }
+          .model-dropdown-select {
+            padding: 5px 8px;
+            font-size: 0.78rem;
+            max-width: 140px;
+          }
+          .active-city-bar {
+            padding: 6px 0.75rem;
+            gap: 8px;
+            flex-direction: column;
+            align-items: stretch;
+          }
+          .city-bar-left {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            gap: 8px;
+            flex-wrap: wrap;
+          }
+          .city-selector-btn {
+            padding: 4px 8px;
+            font-size: 0.8rem;
+          }
+          .active-city-name {
+            max-width: 110px;
+          }
+          .weather-nav-tabs {
+            flex: 0 0 auto;
+          }
+          .weather-tab-btn {
+            padding: 3px 8px;
+            font-size: 0.72rem;
+          }
+          .quick-city-chips {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            padding: 2px 0 4px;
+          }
+          .city-dropdown-menu {
+            width: calc(100% - 1.5rem);
+            max-width: calc(100vw - 1.5rem);
+            left: 0.75rem;
+            right: 0.75rem;
+          }
+          .weather-drawer-panel {
+            padding: 0.75rem;
+          }
+          .current-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+          }
+          .message-stream-container {
+            padding: 1rem 0.75rem;
+          }
+          .welcome-container {
+            margin: 1.5rem auto 0;
+            padding: 0 0.5rem;
+          }
+          .welcome-title {
+            font-size: 1.6rem;
+          }
+          .welcome-subtitle {
+            font-size: 0.9rem;
+            margin-bottom: 1.5rem;
+          }
+          .suggestions-grid {
+            grid-template-columns: 1fr;
+            gap: 8px;
+          }
+          .chat-input-container {
+            padding: 0 0.75rem 0.75rem;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .chat-header {
+            height: 50px;
+            min-height: 50px;
+            padding: 0 0.5rem;
+            gap: 6px;
+          }
+          .header-left {
+            gap: 6px;
+          }
+          .header-title {
+            font-size: 0.82rem;
+            max-width: 95px;
+          }
+          .header-badge {
+            display: none;
+          }
+          .header-right {
+            gap: 6px;
+          }
+          .model-dropdown-select {
+            padding: 4px 6px;
+            font-size: 0.72rem;
+            max-width: 110px;
+          }
+          .settings-trigger-btn {
+            width: 32px;
+            height: 32px;
+          }
+          .menu-btn {
+            width: 32px;
+            height: 32px;
+          }
+          .active-city-bar {
+            padding: 6px 0.5rem;
+            gap: 6px;
+          }
+          .city-bar-left {
+            gap: 6px;
+          }
+          .city-selector-btn {
+            padding: 4px 6px;
+            font-size: 0.75rem;
+          }
+          .active-city-label {
+            display: none;
+          }
+          .active-city-name {
+            max-width: 80px;
+            font-size: 0.78rem;
+          }
+          .weather-tab-btn {
+            padding: 3px 6px;
+          }
+          .weather-tab-btn span {
+            font-size: 0.7rem;
+          }
+          .city-chip {
+            font-size: 0.7rem;
+            padding: 2px 8px;
+          }
+          .city-dropdown-menu {
+            width: calc(100% - 1rem);
+            max-width: calc(100vw - 1rem);
+            left: 0.5rem;
+            right: 0.5rem;
+            padding: 10px;
+          }
+          .weather-drawer-panel {
+            padding: 0.5rem;
+          }
+          .current-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+          }
+          .metric-card {
+            padding: 0.5rem;
+          }
+          .metric-val {
+            font-size: 0.95rem;
+          }
+          .metric-label {
+            font-size: 0.65rem;
+          }
+          .metric-sub {
+            font-size: 0.68rem;
+          }
+          .message-stream-container {
+            padding: 0.75rem 0.5rem;
+          }
+          .message-list {
+            padding-bottom: 1rem;
+          }
+          .welcome-container {
+            margin: 0.75rem auto 0;
+            padding: 0 0.25rem;
+          }
+          .welcome-logo {
+            width: 52px;
+            height: 52px;
+            border-radius: 16px;
+            margin-bottom: 0.75rem;
+          }
+          .welcome-title {
+            font-size: 1.3rem;
+          }
+          .welcome-subtitle {
+            font-size: 0.8rem;
+            margin-bottom: 1rem;
+          }
+          .suggestion-card {
+            padding: 0.85rem;
+            border-radius: 12px;
+          }
+          .suggestion-text {
+            font-size: 0.8rem;
+          }
+          .chat-input-container {
+            padding: 0 0.5rem 0.5rem;
+            gap: 4px;
+          }
+          .input-box-wrapper {
+            padding: 6px 8px;
+            gap: 6px;
+            border-radius: 16px;
+          }
+          .chat-textarea {
+            font-size: 0.88rem;
+            padding: 6px 2px;
+          }
+          .paperclip-btn, .mic-btn, .send-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
+          }
+          .paperclip-btn svg, .mic-btn svg, .send-btn svg {
+            width: 15px;
+            height: 15px;
+          }
+          .lang-toggle-btn {
+            height: 32px;
+            padding: 0 5px;
+            font-size: 0.68rem;
+            border-radius: 10px;
+          }
+          .lang-toggle-btn svg {
+            width: 12px;
+            height: 12px;
+          }
+          .input-disclaimer {
+            font-size: 0.68rem;
+          }
+          .quick-city-chips {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            padding: 2px 0 4px;
+          }
+          .city-dropdown-menu {
+            width: calc(100% - 1.5rem);
+            max-width: calc(100vw - 1.5rem);
+            left: 0.75rem;
+            right: 0.75rem;
+          }
+          .weather-drawer-panel {
+            padding: 0.75rem;
+          }
+          .current-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+          }
+          .message-stream-container {
+            padding: 1rem 0.75rem;
+          }
+          .welcome-container {
+            margin: 1.5rem auto 0;
+            padding: 0 0.5rem;
+          }
+          .welcome-title {
+            font-size: 1.6rem;
+          }
+          .welcome-subtitle {
+            font-size: 0.9rem;
+            margin-bottom: 1.5rem;
+          }
+          .suggestions-grid {
+            grid-template-columns: 1fr;
+            gap: 8px;
+          }
+          .chat-input-container {
+            padding: 0 0.75rem 0.75rem;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .chat-header {
+            height: 50px;
+            min-height: 50px;
+            padding: 0 0.5rem;
+            gap: 6px;
+          }
+          .header-left {
+            gap: 6px;
+          }
+          .header-title {
+            font-size: 0.82rem;
+            max-width: 95px;
+          }
+          .header-badge {
+            display: none;
+          }
+          .header-right {
+            gap: 6px;
+          }
+          .model-dropdown-select {
+            padding: 4px 6px;
+            font-size: 0.72rem;
+            max-width: 110px;
+          }
+          .settings-trigger-btn {
+            width: 32px;
+            height: 32px;
+          }
+          .menu-btn {
+            width: 32px;
+            height: 32px;
+          }
+          .active-city-bar {
+            padding: 6px 0.5rem;
+            gap: 6px;
+          }
+          .city-bar-left {
+            gap: 6px;
+          }
+          .city-selector-btn {
+            padding: 4px 6px;
+            font-size: 0.75rem;
+          }
+          .active-city-label {
+            display: none;
+          }
+          .active-city-name {
+            max-width: 80px;
+            font-size: 0.78rem;
+          }
+          .weather-tab-btn {
+            padding: 3px 6px;
+          }
+          .weather-tab-btn span {
+            font-size: 0.7rem;
+          }
+          .city-chip {
+            font-size: 0.7rem;
+            padding: 2px 8px;
+          }
+          .city-dropdown-menu {
+            width: calc(100% - 1rem);
+            max-width: calc(100vw - 1rem);
+            left: 0.5rem;
+            right: 0.5rem;
+            padding: 10px;
+          }
+          .weather-drawer-panel {
+            padding: 0.5rem;
+          }
+          .current-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+          }
+          .metric-card {
+            padding: 0.5rem;
+          }
+          .metric-val {
+            font-size: 0.95rem;
+          }
+          .metric-label {
+            font-size: 0.65rem;
+          }
+          .metric-sub {
+            font-size: 0.68rem;
+          }
+          .message-stream-container {
+            padding: 0.75rem 0.5rem;
+          }
+          .message-list {
+            padding-bottom: 1rem;
+          }
+          .welcome-container {
+            margin: 0.75rem auto 0;
+            padding: 0 0.25rem;
+          }
+          .welcome-logo {
+            width: 52px;
+            height: 52px;
+            border-radius: 16px;
+            margin-bottom: 0.75rem;
+          }
+          .welcome-title {
+            font-size: 1.3rem;
+          }
+          .welcome-subtitle {
+            font-size: 0.8rem;
+            margin-bottom: 1rem;
+          }
+          .suggestion-card {
+            padding: 0.85rem;
+            border-radius: 12px;
+          }
+          .suggestion-text {
+            font-size: 0.8rem;
+          }
+          .chat-input-container {
+            padding: 0 0.5rem 0.5rem;
+            gap: 4px;
+          }
+          .input-box-wrapper {
+            padding: 6px 8px;
+            gap: 6px;
+            border-radius: 16px;
+          }
+          .chat-textarea {
+            font-size: 0.88rem;
+            padding: 6px 2px;
+          }
+          .paperclip-btn, .mic-btn, .send-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
+          }
+          .paperclip-btn svg, .mic-btn svg, .send-btn svg {
+            width: 15px;
+            height: 15px;
+          }
+          .lang-toggle-btn {
+            height: 32px;
+            padding: 0 5px;
+            font-size: 0.68rem;
+            border-radius: 10px;
+          }
+          .lang-toggle-btn svg {
+            width: 12px;
+            height: 12px;
+          }
+          .input-disclaimer {
+            font-size: 0.68rem;
+          }
+          .attachment-preview {
+            padding: 6px 10px;
+            border-radius: 10px;
+          }
+          .attachment-name {
+            max-width: 140px;
+            font-size: 0.78rem;
+          }
         }
       `}} />
     </div>
