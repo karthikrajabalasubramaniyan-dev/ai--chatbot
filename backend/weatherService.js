@@ -145,14 +145,14 @@ function extractTemporalIntent(message) {
     };
   }
 
-  // 2. Historical: Date range
-  const rangeMatch = msg.match(/\b(?:from|between)?\s*([a-zA-Z]+)\s+(\d{1,2})(?:st|nd|rd|th)?\s+(?:to|and|-|through)\s+(?:([a-zA-Z]+)\s+)?(\d{1,2})(?:st|nd|rd|th)?,?\s*(\d{4})?\b/i);
-  if (rangeMatch) {
-    const month1Str = rangeMatch[1].toLowerCase();
-    const day1 = parseInt(rangeMatch[2], 10);
-    const month2Str = (rangeMatch[3] || rangeMatch[1]).toLowerCase();
-    const day2 = parseInt(rangeMatch[4], 10);
-    const year = rangeMatch[5] ? parseInt(rangeMatch[5], 10) : currentYear;
+  // 2. Historical: Date range (Month Day to Month Day, Year OR Day Month to Day Month, Year)
+  const rangeMatch1 = msg.match(/\b(?:from|between)?\s*([a-zA-Z]+)\s+(\d{1,2})(?:st|nd|rd|th)?\s+(?:to|and|-|through)\s+(?:([a-zA-Z]+)\s+)?(\d{1,2})(?:st|nd|rd|th)?,?\s*(\d{4})?\b/i);
+  if (rangeMatch1 && MONTH_MAP[rangeMatch1[1].toLowerCase()]) {
+    const month1Str = rangeMatch1[1].toLowerCase();
+    const day1 = parseInt(rangeMatch1[2], 10);
+    const month2Str = (rangeMatch1[3] || rangeMatch1[1]).toLowerCase();
+    const day2 = parseInt(rangeMatch1[4], 10);
+    const year = rangeMatch1[5] ? parseInt(rangeMatch1[5], 10) : currentYear;
 
     const m1 = MONTH_MAP[month1Str];
     const m2 = MONTH_MAP[month2Str];
@@ -169,12 +169,35 @@ function extractTemporalIntent(message) {
     }
   }
 
-  // 3. Historical: Single explicit date
-  const singleDateMatch = msg.match(/\b(?:on\s+)?([a-zA-Z]+)\s+(\d{1,2})(?:st|nd|rd|th)?,?\s*(\d{4})?\b/i);
-  if (singleDateMatch && MONTH_MAP[singleDateMatch[1].toLowerCase()]) {
-    const monthStr = singleDateMatch[1].toLowerCase();
-    const dayVal = parseInt(singleDateMatch[2], 10);
-    const yearVal = singleDateMatch[3] ? parseInt(singleDateMatch[3], 10) : currentYear;
+  const rangeMatch2 = msg.match(/\b(?:from|between)?\s*(\d{1,2})(?:st|nd|rd|th)?\s+([a-zA-Z]+)\s+(?:to|and|-|through)\s+(\d{1,2})(?:st|nd|rd|th)?\s+([a-zA-Z]+)?,?\s*(\d{4})?\b/i);
+  if (rangeMatch2 && MONTH_MAP[rangeMatch2[2].toLowerCase()]) {
+    const day1 = parseInt(rangeMatch2[1], 10);
+    const month1Str = rangeMatch2[2].toLowerCase();
+    const day2 = parseInt(rangeMatch2[3], 10);
+    const month2Str = (rangeMatch2[4] || rangeMatch2[2]).toLowerCase();
+    const year = rangeMatch2[5] ? parseInt(rangeMatch2[5], 10) : currentYear;
+
+    const m1 = MONTH_MAP[month1Str];
+    const m2 = MONTH_MAP[month2Str];
+
+    if (m1 && m2 && day1 >= 1 && day1 <= 31 && day2 >= 1 && day2 <= 31) {
+      const sDate = `${year}-${String(m1).padStart(2, "0")}-${String(day1).padStart(2, "0")}`;
+      const eDate = `${year}-${String(m2).padStart(2, "0")}-${String(day2).padStart(2, "0")}`;
+      return {
+        type: "historical",
+        description: `${day1} ${month1Str} to ${day2} ${month2Str}, ${year}`,
+        startDate: sDate,
+        endDate: eDate
+      };
+    }
+  }
+
+  // 3. Historical: Single explicit date (Month Day, Year OR Day Month, Year)
+  const singleDateMatch1 = msg.match(/\b(?:on\s+)?([a-zA-Z]+)\s+(\d{1,2})(?:st|nd|rd|th)?,?\s*(\d{4})?\b/i);
+  if (singleDateMatch1 && MONTH_MAP[singleDateMatch1[1].toLowerCase()]) {
+    const monthStr = singleDateMatch1[1].toLowerCase();
+    const dayVal = parseInt(singleDateMatch1[2], 10);
+    const yearVal = singleDateMatch1[3] ? parseInt(singleDateMatch1[3], 10) : currentYear;
     const monthNum = MONTH_MAP[monthStr];
 
     if (monthNum && dayVal >= 1 && dayVal <= 31) {
@@ -188,14 +211,42 @@ function extractTemporalIntent(message) {
     }
   }
 
-  // 4. Historical: ISO format
-  const isoRangeMatch = msg.match(/\b(\d{4}-\d{2}-\d{2})\s+(?:to|and|-)\s+(\d{4}-\d{2}-\d{2})\b/);
+  const singleDateMatch2 = msg.match(/\b(?:on\s+)?(\d{1,2})(?:st|nd|rd|th)?\s+([a-zA-Z]+),?\s*(\d{4})?\b/i);
+  if (singleDateMatch2 && MONTH_MAP[singleDateMatch2[2].toLowerCase()]) {
+    const dayVal = parseInt(singleDateMatch2[1], 10);
+    const monthStr = singleDateMatch2[2].toLowerCase();
+    const yearVal = singleDateMatch2[3] ? parseInt(singleDateMatch2[3], 10) : currentYear;
+    const monthNum = MONTH_MAP[monthStr];
+
+    if (monthNum && dayVal >= 1 && dayVal <= 31) {
+      const dateStr = `${yearVal}-${String(monthNum).padStart(2, "0")}-${String(dayVal).padStart(2, "0")}`;
+      return {
+        type: "historical",
+        description: `${dayVal} ${monthStr}, ${yearVal}`,
+        startDate: dateStr,
+        endDate: dateStr
+      };
+    }
+  }
+
+  // 4. Historical: ISO format (range or single)
+  const isoRangeMatch = msg.match(/\b(\d{4}-\d{2}-\d{2})\s+(?:to|and|-|through)\s+(\d{4}-\d{2}-\d{2})\b/);
   if (isoRangeMatch) {
     return {
       type: "historical",
       description: `${isoRangeMatch[1]} to ${isoRangeMatch[2]}`,
       startDate: isoRangeMatch[1],
       endDate: isoRangeMatch[2]
+    };
+  }
+
+  const isoSingleMatch = msg.match(/\b(?:on\s+)?(\d{4}-\d{2}-\d{2})\b/);
+  if (isoSingleMatch) {
+    return {
+      type: "historical",
+      description: `${isoSingleMatch[1]}`,
+      startDate: isoSingleMatch[1],
+      endDate: isoSingleMatch[1]
     };
   }
 
@@ -252,9 +303,15 @@ function extractTemporalIntent(message) {
   }
 
   // 9. Hourly
-  if (/\b(hourly|hour\s+by\s+hour|next\s+(\d+)\s+hours|by\s+the\s+hour)\b/i.test(msg)) {
-    const hourMatch = msg.match(/next\s+(\d+)\s+hours/i);
-    const hours = hourMatch ? Math.min(parseInt(hourMatch[1], 10), 48) : 24;
+  if (/\b(hourly|hour\s+by\s+hour|by\s+the\s+hour|(?:next|for|the)?\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|twenty-four|24|48)\s*[- ]?hours?)\b/i.test(msg)) {
+    const wordHours = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, twelve: 12, 'twenty-four': 24, twentyfour: 24 };
+    const hourMatch = msg.match(/\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|twenty-four|24|48)\s*[- ]?hours?\b/i);
+    let hours = 24;
+    if (hourMatch && hourMatch[1]) {
+      const raw = hourMatch[1].toLowerCase();
+      hours = wordHours[raw] || parseInt(raw, 10);
+    }
+    hours = Math.min(Math.max(hours || 24, 1), 48);
     return {
       type: "hourly",
       description: `next ${hours} hours`,
@@ -281,10 +338,17 @@ function extractTemporalIntent(message) {
     };
   }
 
-  // 12. Multi-day forecast
-  if (/\b(forecast|weekly|this\s+week|next\s+week|next\s+(\d+)\s+days|7\s+days|extended)\b/i.test(msg)) {
-    const daysMatch = msg.match(/next\s+(\d+)\s+days/i);
-    const days = daysMatch ? Math.min(parseInt(daysMatch[1], 10), 14) : 7;
+  // 12. Multi-day forecast (e.g. "5 day forecast", "5-day forecast", "5 days weather", "next 5 days", "weekly", "10 days")
+  const forecastPattern = /\b(?:(?:next|for|the)?\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten|14)\s*[- ]?days?(?:\s+(?:weather|forecast))?|forecast|weekly|this\s+week|next\s+week|extended)\b/i;
+  if (forecastPattern.test(msg)) {
+    const wordNumbers = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, fourteen: 14 };
+    const numMatch = msg.match(/\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|14)\s*[- ]?days?\b/i);
+    let days = 7;
+    if (numMatch && numMatch[1]) {
+      const raw = numMatch[1].toLowerCase();
+      days = wordNumbers[raw] || parseInt(raw, 10);
+    }
+    days = Math.min(Math.max(days || 7, 1), 14);
     return {
       type: "forecast",
       description: `${days}-day forecast`,
@@ -299,6 +363,46 @@ function extractTemporalIntent(message) {
   };
 }
 
+const LOCATION_BLACKLIST = new Set([
+  "give", "gives", "given", "giving", "show", "shows", "showing", "tell", "tells", "telling", 
+  "get", "gets", "getting", "check", "checking", "find", "finding", "provide", "display", "fetch", 
+  "know", "see", "please", "can", "could", "would", "should", "will", "what", "whats", "how", "hows", 
+  "why", "when", "where", "who", "which", "is", "are", "was", "were", "am", "be", "been", "being", 
+  "do", "does", "did", "have", "has", "had", "next", "previous", "past", "last", "coming", "upcoming", 
+  "hour", "hours", "hr", "hrs", "day", "days", "week", "weeks", "month", "months", "year", "years", 
+  "time", "times", "report", "reports", "update", "updates", "info", "information", "data", "details", 
+  "summary", "condition", "conditions", "status", "overview", "prediction", "outlook", "hourly", 
+  "daily", "weekly", "monthly", "today", "tomorrow", "yesterday", "tonight", "morning", "afternoon", 
+  "evening", "night", "now", "current", "currently", "here", "there", "outside", "me", "us", "my", 
+  "your", "our", "it", "its", "this", "that", "the", "a", "an", "city", "place", "location", "area", 
+  "town", "village", "state", "country", "weather", "forecast", "climate", "temperature", "temp", 
+  "rain", "raining", "rainfall", "humidity", "wind", "speed", "pressure", "uv", "aqi", "travel", 
+  "safe", "good", "bad", "hot", "cold", "warm", "umbrella", "compare", "historical", "january", 
+  "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"
+]);
+
+function cleanLocationCandidate(str) {
+  if (!str || typeof str !== "string") return null;
+  let s = str.trim()
+    .replace(/^[,\s?.!-]+|[,\s?.!-]+$/g, "")
+    .replace(/^(?:the|a|an|in|at|for|near|around|of|to|from)\s+/i, "")
+    .replace(/\s+(?:today|tomorrow|yesterday|now|right\s+now|currently|this\s+weekend|next\s+week|last\s+week)$/i, "")
+    .trim();
+
+  // Strip temporal suffixes like "for the next 6 hours" or "for 5 days"
+  s = s.replace(/\s+(?:for|in)\s+(?:the\s+)?(?:next|past|last)?\s*\d+\s*(?:hours?|days?|weeks?|months?)$/i, "").trim();
+
+  if (s.length < 2) return null;
+  if (LOCATION_BLACKLIST.has(s.toLowerCase())) return null;
+
+  // Filter out candidates consisting purely of blacklisted words or numbers
+  const words = s.toLowerCase().split(/\s+/);
+  const nonBlacklistWords = words.filter(w => !LOCATION_BLACKLIST.has(w) && !/^\d+$/.test(w));
+  if (nonBlacklistWords.length === 0) return null;
+
+  return s;
+}
+
 /**
  * 3. Extract target location from message, active city payload, or conversation history
  */
@@ -307,24 +411,20 @@ function extractLocation(message, history = [], activeCity = null, clientLocatio
     if (activeCity) return { locationName: activeCity, source: "payload", isExplicitInQuery: false };
     return null;
   }
-  const msg = message.trim();
+  const rawMsg = message.trim();
 
-  const blacklist = [
-    "today", "tomorrow", "yesterday", "tonight", "now", "here", "there",
-    "my location", "current location", "this week", "next week", "last week",
-    "last month", "last year", "weekend", "this weekend", "me", "us", "outside", "it", "city", "place",
-    "weather", "forecast", "climate", "temperature", "temp", "rain", "raining", "rainfall",
-    "humidity", "wind", "speed", "the", "a", "an", "morning", "afternoon", "evening", "night",
-    "january", "february", "march", "april", "may", "june", "july", "august", "september",
-    "october", "november", "december", "will it", "is it", "did it", "can it", "right now", "right",
-    "good", "safe", "bad", "hot", "cold", "warm", "hourly", "travel", "umbrella", "compare", "historical"
-  ];
+  // Strip leading conversational command prefixes
+  const commandPrefixRegex = /^(?:please\s+)?(?:can\s+you\s+|could\s+you\s+|would\s+you\s+)?(?:give|show|tell|get|find|fetch|check|display|provide|let\s+me\s+know|what\s+is|whats|how\s+is|what\s+about|how\s+about)\s+(?:me\s+|us\s+)?(?:the\s+|a\s+|an\s+)?/i;
 
-  // Pattern 1: "What about <City>?"
-  const whatAboutMatch = msg.match(/\b(?:what|how)\s+about\s+([a-zA-Z\u0080-\uFFFF\s.-]+?)(?:\s+(?:today|tomorrow|yesterday|now|weather|temp|last\s+week)?|[?!.]|$)/i);
-  if (whatAboutMatch && whatAboutMatch[1]) {
-    let candidate = whatAboutMatch[1].trim().replace(/[?,.!]+$/, "").trim();
-    if (candidate.length >= 2 && !blacklist.includes(candidate.toLowerCase())) {
+  // Pattern 1: Explicit preposition with city name
+  // Match "in/at/for/around/near/of <City>"
+  const prepRegex = /\b(?:in|at|for|around|near|of)\s+([a-zA-Z\u0080-\uFFFF\s.-]+?)(?:\s+(?:for|in|at|from|to|between|on|today|tomorrow|yesterday|now|right\s+now|currently|hourly|forecast|weather|temp|temperature|next\s+\d+|this\s+weekend|next\s+week|last\s+week)|[?!.]|$)/gi;
+
+  let match;
+  while ((match = prepRegex.exec(rawMsg)) !== null) {
+    const rawCandidate = match[1];
+    const candidate = cleanLocationCandidate(rawCandidate);
+    if (candidate) {
       return {
         locationName: candidate,
         source: "query",
@@ -333,47 +433,14 @@ function extractLocation(message, history = [], activeCity = null, clientLocatio
     }
   }
 
-  // Pattern 2: "in/at/for/around/near/of <City>"
-  const inMatches = [
-    /\b(?:in|at|for|around|near|of)\s+([a-zA-Z\u0080-\uFFFF\s.-]+?)(?:\s+(?:today|tomorrow|yesterday|last\s+week|last\s+month|last\s+year|this\s+week|next\s+week|now|right\s+now|currently|this\s+weekend|hourly|between|from|on\s+[a-zA-Z0-9,\s]+)|[?!.]|$)/i,
-    /\b(?:in|at|for|around|near|of)\s+([a-zA-Z\u0080-\uFFFF\s.-]+)$/i
-  ];
+  // Pattern 2: "Show me <City> hourly weather" or "Tell me <City> weather"
+  const strippedMsg = rawMsg.replace(commandPrefixRegex, "").trim();
 
-  for (const rx of inMatches) {
-    const match = msg.match(rx);
-    if (match && match[1]) {
-      let candidate = match[1].trim().replace(/[?,.!]+$/, "").trim();
-      candidate = candidate.replace(/^(the|a|an)\s+/i, "").replace(/\s+(right|now)$/i, "").trim();
-      if (candidate.length >= 2 && !blacklist.includes(candidate.toLowerCase())) {
-        return {
-          locationName: candidate,
-          source: "query",
-          isExplicitInQuery: true
-        };
-      }
-    }
-  }
-
-  // Pattern 3: City name followed by "weather / forecast / temperature / history / last week"
-  if (!/^(what|how|will|is|did|can|does|could|should|tell|show|compare)\b/i.test(msg)) {
-    const cityPreMatch = msg.match(/^([a-zA-Z\u0080-\uFFFF\s.-]+?)\s+(?:weather|forecast|temperature|temp|climate|rainfall|rain|hourly|history|last\s+week|yesterday)/i);
-    if (cityPreMatch && cityPreMatch[1]) {
-      const candidate = cityPreMatch[1].trim().replace(/^(the|check|show)\s+/i, "").trim();
-      if (candidate.length >= 2 && !blacklist.includes(candidate.toLowerCase())) {
-        return {
-          locationName: candidate,
-          source: "query",
-          isExplicitInQuery: true
-        };
-      }
-    }
-  }
-
-  // Pattern 4: "Show <City> weather from..."
-  const showCityMatch = msg.match(/\bshow\s+([a-zA-Z\u0080-\uFFFF\s.-]+?)\s+(?:weather|forecast|history|temperature|from|between)/i);
-  if (showCityMatch && showCityMatch[1]) {
-    let candidate = showCityMatch[1].trim();
-    if (candidate.length >= 2 && !blacklist.includes(candidate.toLowerCase())) {
+  // Check if stripped query starts with a city name before weather terms
+  const cityBeforeWeatherMatch = strippedMsg.match(/^([a-zA-Z\u0080-\uFFFF\s.-]+?)\s+(?:hourly|weather|forecast|temperature|temp|climate|rain|rainfall|aqi|air\s+quality|history|past\s+weather|conditions?)/i);
+  if (cityBeforeWeatherMatch && cityBeforeWeatherMatch[1]) {
+    const candidate = cleanLocationCandidate(cityBeforeWeatherMatch[1]);
+    if (candidate) {
       return {
         locationName: candidate,
         source: "query",
@@ -382,8 +449,22 @@ function extractLocation(message, history = [], activeCity = null, clientLocatio
     }
   }
 
-  // Pattern 5: "here" / "my location"
-  if (/\b(here|my location|current location|local|where i am)\b/i.test(msg)) {
+  // Pattern 3: City at the very end of stripped message
+  // e.g. "Next 6 hours Chennai", "Hourly weather Chennai"
+  const cityAtEndMatch = strippedMsg.match(/(?:hourly|weather|forecast|temperature|temp|hours?|days?)\s+([a-zA-Z\u0080-\uFFFF\s.-]+)$/i);
+  if (cityAtEndMatch && cityAtEndMatch[1]) {
+    const candidate = cleanLocationCandidate(cityAtEndMatch[1]);
+    if (candidate) {
+      return {
+        locationName: candidate,
+        source: "query",
+        isExplicitInQuery: true
+      };
+    }
+  }
+
+  // Pattern 4: "here" / "my location"
+  if (/\b(here|my location|current location|local|where i am)\b/i.test(rawMsg)) {
     if (clientLocation && (clientLocation.city || (clientLocation.latitude && clientLocation.longitude))) {
       return {
         locationName: clientLocation.city || `${clientLocation.latitude},${clientLocation.longitude}`,
@@ -407,7 +488,7 @@ function extractLocation(message, history = [], activeCity = null, clientLocatio
     };
   }
 
-  // Pattern 6: Active city passed in request payload
+  // Pattern 5: Active city passed in request payload
   if (activeCity && typeof activeCity === "string" && activeCity.trim().length > 0) {
     return {
       locationName: activeCity.trim(),
@@ -416,13 +497,13 @@ function extractLocation(message, history = [], activeCity = null, clientLocatio
     };
   }
 
-  // Pattern 7: Search conversation history
+  // Pattern 6: Search conversation history
   if (Array.isArray(history) && history.length > 0) {
     for (let i = history.length - 1; i >= 0; i--) {
       const item = history[i];
       if (item && item.role === "user" && item.content) {
         const extracted = extractLocation(item.content, [], null, null);
-        if (extracted && extracted.locationName) {
+        if (extracted && extracted.locationName && extracted.isExplicitInQuery) {
           return {
             locationName: extracted.locationName,
             source: "history",
@@ -653,7 +734,8 @@ async function fetchCurrentWeatherData(locationInfo) {
         const todayDay = fday[0]?.day || {};
         const tomorrowDay = fday[1]?.day || {};
 
-        const formattedLocation = [l.name || name, l.region || admin1, l.country || country].filter(Boolean).join(", ");
+        const cityNameResolved = name || l.name || "Unknown";
+        const formattedLocation = geo.displayName || [cityNameResolved, admin1 || l.region, country || l.country].filter(Boolean).join(", ");
         const todayRainProb = todayDay.daily_chance_of_rain !== undefined ? todayDay.daily_chance_of_rain : (c.precip_mm > 0 ? 80 : 10);
         const tomorrowRainProb = tomorrowDay.daily_chance_of_rain !== undefined ? tomorrowDay.daily_chance_of_rain : 0;
 
@@ -661,9 +743,9 @@ async function fetchCurrentWeatherData(locationInfo) {
           mode: "current",
           provider: "WeatherAPI",
           location: formattedLocation,
-          cityName: l.name || name,
-          admin1: l.region || admin1 || "",
-          country: l.country || country || "",
+          cityName: cityNameResolved,
+          admin1: admin1 || l.region || "",
+          country: country || l.country || "",
           latitude: l.lat || latitude,
           longitude: l.lon || longitude,
           temperature: Math.round(c.temp_c ?? 0),
@@ -787,7 +869,8 @@ async function fetchForecastWeatherData(locationInfo, days = 7) {
 
       if (data && data.forecast?.forecastday) {
         const l = data.location || geo;
-        const formattedLocation = [l.name || name, l.region || admin1, l.country || country].filter(Boolean).join(", ");
+        const cityNameResolved = name || l.name || "Unknown";
+        const formattedLocation = geo.displayName || [cityNameResolved, admin1 || l.region, country || l.country].filter(Boolean).join(", ");
         const dailyForecasts = data.forecast.forecastday.map((fd, i) => {
           const day = fd.day || {};
           const dateStr = fd.date;
@@ -807,6 +890,68 @@ async function fetchForecastWeatherData(locationInfo, days = 7) {
           };
         });
 
+        // If WeatherAPI provided all requested days
+        if (dailyForecasts.length >= numDays) {
+          return {
+            mode: "forecast",
+            provider: "WeatherAPI",
+            location: formattedLocation,
+            cityName: cityNameResolved,
+            admin1: admin1 || l.region || "",
+            country: country || l.country || "",
+            latitude: l.lat || latitude,
+            longitude: l.lon || longitude,
+            requestedDays: numDays,
+            days: dailyForecasts.length,
+            forecast: dailyForecasts
+          };
+        }
+
+        // If WeatherAPI tier caps forecast at fewer days (e.g. 3 days on free tier) and user requested more (e.g. 5 or 7 days)
+        try {
+          const omUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max&timezone=auto&forecast_days=${numDays}`;
+          const omData = await fetchWithRetry(omUrl);
+          const omDaily = omData.daily || {};
+
+          if (omDaily.time && Array.isArray(omDaily.time) && omDaily.time.length >= numDays) {
+            const omForecasts = [];
+            for (let i = 0; i < omDaily.time.length; i++) {
+              const code = omDaily.weather_code?.[i] ?? 0;
+              const dateStr = omDaily.time[i];
+              const dayName = new Date(dateStr).toLocaleDateString("en-US", { weekday: "short" });
+
+              omForecasts.push({
+                date: dateStr,
+                dayName: i === 0 ? "Today" : i === 1 ? "Tomorrow" : dayName,
+                maxTemp: Math.round(omDaily.temperature_2m_max?.[i] ?? 0),
+                minTemp: Math.round(omDaily.temperature_2m_min?.[i] ?? 0),
+                condition: decodeWmoCode(code),
+                weatherCode: code,
+                rainProbability: omDaily.precipitation_probability_max?.[i] ?? 0,
+                precipitationSum: omDaily.precipitation_sum?.[i] ?? 0,
+                windSpeedMax: Math.round(omDaily.wind_speed_10m_max?.[i] ?? 0),
+                uvIndex: omDaily.uv_index_max?.[i] ?? 0
+              });
+            }
+
+            return {
+              mode: "forecast",
+              provider: "Open-Meteo",
+              location: formattedLocation,
+              cityName: l.name || name,
+              admin1: l.region || admin1 || "",
+              country: l.country || country || "",
+              latitude: l.lat || latitude,
+              longitude: l.lon || longitude,
+              requestedDays: numDays,
+              days: omForecasts.length,
+              forecast: omForecasts
+            };
+          }
+        } catch (omErr) {
+          // If Open-Meteo fallback fails, return available WeatherAPI days
+        }
+
         return {
           mode: "forecast",
           provider: "WeatherAPI",
@@ -816,7 +961,9 @@ async function fetchForecastWeatherData(locationInfo, days = 7) {
           country: l.country || country || "",
           latitude: l.lat || latitude,
           longitude: l.lon || longitude,
+          requestedDays: numDays,
           days: dailyForecasts.length,
+          limitedByProvider: true,
           forecast: dailyForecasts
         };
       }
@@ -863,6 +1010,7 @@ async function fetchForecastWeatherData(locationInfo, days = 7) {
     country: country || "",
     latitude,
     longitude,
+    requestedDays: numDays,
     days: dailyForecasts.length,
     forecast: dailyForecasts
   };
@@ -1032,14 +1180,17 @@ async function fetchHistoricalWeatherData(locationInfo, startDate, endDate) {
       }
 
       if (records.length > 0) {
-        const formattedLocation = locInfo ? [locInfo.name, locInfo.region, locInfo.country].filter(Boolean).join(", ") : [name, admin1, country].filter(Boolean).join(", ");
+        const requestedCity = name;
+        const stationName = (locInfo?.name && locInfo.name.toLowerCase() !== requestedCity.toLowerCase()) ? locInfo.name : null;
+        const formattedLocation = geo.displayName || [requestedCity, admin1 || locInfo?.region, country || locInfo?.country].filter(Boolean).join(", ");
         return {
           mode: "historical",
           provider: "WeatherAPI",
           location: formattedLocation,
-          cityName: locInfo?.name || name,
-          admin1: locInfo?.region || admin1 || "",
-          country: locInfo?.country || country || "",
+          cityName: requestedCity,
+          stationName: stationName,
+          admin1: admin1 || locInfo?.region || "",
+          country: country || locInfo?.country || "",
           startDate,
           endDate,
           recordsCount: records.length,
@@ -1057,7 +1208,8 @@ async function fetchHistoricalWeatherData(locationInfo, startDate, endDate) {
   const data = await fetchWithRetry(archiveUrl);
   const daily = data.daily || {};
   const hourly = data.hourly || {};
-  const formattedLocation = [name, admin1, country].filter(Boolean).join(", ");
+  const requestedCity = name;
+  const formattedLocation = geo.displayName || [requestedCity, admin1, country].filter(Boolean).join(", ");
   const records = [];
 
   const hourlyHumidities = hourly.relative_humidity_2m || [];
@@ -1091,7 +1243,8 @@ async function fetchHistoricalWeatherData(locationInfo, startDate, endDate) {
     mode: "historical",
     provider: "Open-Meteo",
     location: formattedLocation,
-    cityName: name,
+    cityName: requestedCity,
+    stationName: null,
     admin1: admin1 || "",
     country: country || "",
     startDate,
@@ -1105,7 +1258,7 @@ async function fetchHistoricalWeatherData(locationInfo, startDate, endDate) {
  * 10. Build LLM prompt context for CURRENT, FORECAST, HISTORICAL, and COMPARISON weather
  */
 function buildWeatherContextPrompt(weatherData, forecastData = null, hourlyData = null, historicalData = null, temporalInfo = null) {
-  if (!weatherData && !historicalData) return "";
+  if (!weatherData && !historicalData && !forecastData) return "";
 
   // 1. COMPARISON CONTEXT
   if (temporalInfo?.type === "comparison" && historicalData) {
@@ -1149,9 +1302,12 @@ INSTRUCTIONS FOR AI ASSISTANT:
   // 2. HISTORICAL WEATHER CONTEXT
   if (weatherData?.mode === "historical" || historicalData?.mode === "historical") {
     const data = historicalData || weatherData;
+    const requestedCity = data.cityName || data.location || "the requested location";
+    const stationNote = data.stationName ? ` (Weather Station: ${data.stationName})` : "";
     let histPrompt = `
 HISTORICAL WEATHER
-City: ${data.location || data.cityName}
+Target Location: ${data.location || requestedCity}${stationNote}
+Requested City: ${requestedCity}
 Date Range: ${data.startDate} to ${data.endDate}
 `;
 
@@ -1167,17 +1323,22 @@ Rainfall: ${r.precipitation} mm
 
     histPrompt += `
 INSTRUCTIONS FOR AI ASSISTANT:
-1. Answer the user's historical weather question accurately and conversationally based STRICTLY on the real recorded data above.
-2. Highlight temperatures, recorded weather conditions, humidity, wind, and rainfall.
-3. NEVER invent or hallucinate past weather values.
+1. Answer the user's historical weather question directly for "${requestedCity}" using ONLY the verified recorded meteorological data provided above.
+2. Treat this data as the verified official historical record for ${requestedCity}. DO NOT claim that data for ${requestedCity} is missing or that you only have data for another area.
+3. If a local weather station (${data.stationName || "local station"}) is noted, you may mention it as the local station for ${requestedCity}, but answer the question directly for ${requestedCity}.
+4. Detail the temperatures (Max, Min, Mean), recorded conditions, humidity, wind, and rainfall accurately.
+5. NEVER invent or hallucinate past weather values.
 `;
     return histPrompt.trim();
   }
 
   // 3. CURRENT & FORECAST CONTEXT
-  let prompt = `
-CURRENT WEATHER
-City: ${weatherData.location || weatherData.cityName}
+  const locName = weatherData?.location || weatherData?.cityName || forecastData?.location || forecastData?.cityName || "Current Location";
+  let prompt = "";
+
+  if (weatherData && weatherData.temperature !== undefined) {
+    prompt += `CURRENT WEATHER
+City: ${locName}
 Temperature: ${weatherData.temperature}°C
 Feels Like: ${weatherData.feelsLike}°C
 Condition: ${weatherData.condition}
@@ -1187,26 +1348,24 @@ Pressure: ${weatherData.pressure || 1013} hPa
 Precipitation: ${weatherData.precipitation} mm
 Rain Probability: ${weatherData.rainProbability}%
 UV Index: ${weatherData.uvIndex}
-
-FORECAST
-Today:
-High: ${weatherData.today.maxTemp}°C
-Low: ${weatherData.today.minTemp}°C
-Rain Probability: ${weatherData.today.rainProbability}%
-Condition: ${weatherData.today.condition}
-
-Tomorrow:
-High: ${weatherData.tomorrow.maxTemp}°C
-Low: ${weatherData.tomorrow.minTemp}°C
-Rain Probability: ${weatherData.tomorrow.rainProbability}%
-Condition: ${weatherData.tomorrow.condition}
 `;
+  }
 
-  if (forecastData && forecastData.forecast && forecastData.forecast.length > 2) {
-    prompt += `\nExtended Forecast:\n`;
-    forecastData.forecast.slice(2).forEach(f => {
-      prompt += `- ${f.dayName} (${f.date}): High: ${f.maxTemp}°C, Low: ${f.minTemp}°C, Condition: ${f.condition}, Rain Probability: ${f.rainProbability}%, Wind: ${f.windSpeedMax} km/h\n`;
+  if (forecastData && forecastData.forecast && forecastData.forecast.length > 0) {
+    prompt += `\nFORECAST (${forecastData.forecast.length} Days Provided):\n`;
+    forecastData.forecast.forEach((f, i) => {
+      prompt += `- Day ${i + 1} - ${f.dayName} (${f.date}): High: ${f.maxTemp}°C, Low: ${f.minTemp}°C, Condition: ${f.condition}, Rain Probability: ${f.rainProbability}%, Max Wind: ${f.windSpeedMax} km/h\n`;
     });
+
+    if (forecastData.limitedByProvider && forecastData.requestedDays > forecastData.days) {
+      prompt += `\nNOTE FOR AI: The user requested a ${forecastData.requestedDays}-day forecast, but the weather service returned ${forecastData.days} days of data. Clearly present all ${forecastData.days} available days and state that only ${forecastData.days} days are available from the weather provider. DO NOT invent or fabricate missing days.\n`;
+    }
+  } else if (weatherData?.today && weatherData?.tomorrow) {
+    prompt += `
+FORECAST:
+- Today (${weatherData.today.date}): High ${weatherData.today.maxTemp}°C, Low ${weatherData.today.minTemp}°C, Condition: ${weatherData.today.condition}, Rain Chance: ${weatherData.today.rainProbability}%
+- Tomorrow (${weatherData.tomorrow.date}): High ${weatherData.tomorrow.maxTemp}°C, Low ${weatherData.tomorrow.minTemp}°C, Condition: ${weatherData.tomorrow.condition}, Rain Chance: ${weatherData.tomorrow.rainProbability}%
+`;
   }
 
   if (hourlyData && hourlyData.hourly && hourlyData.hourly.length > 0) {
@@ -1219,9 +1378,9 @@ Condition: ${weatherData.tomorrow.condition}
   prompt += `
 INSTRUCTIONS FOR AI ASSISTANT:
 1. Answer the user's weather question naturally and conversationally using ONLY the verified real numbers and conditions above.
-2. Provide practical advice when relevant (e.g. carry an umbrella if rain probability >= 40%, stay hydrated if hot).
-3. Reference the exact values above for current temp, tomorrow, weekend, humidity, wind, or travel suitability.
-4. NEVER invent, hallucinate, or estimate weather values.
+2. When the user asks for a multi-day forecast (e.g. 5-day forecast), present all provided forecast days clearly in order (Day 1, Day 2, etc.) with high/low temperatures, conditions, and rain probabilities.
+3. If the weather provider returned fewer days than requested, report the actual days provided and clearly state that the provider supplied data for those days. NEVER invent, hallucinate, or estimate missing days or numbers.
+4. Provide practical advice when relevant (e.g. carry an umbrella if rain probability >= 40%, stay hydrated if hot).
 `;
 
   return prompt.trim();
@@ -1230,8 +1389,8 @@ INSTRUCTIONS FOR AI ASSISTANT:
 /**
  * 11. Conversational fallback response generator from real meteorological data
  */
-function getMockWeatherConversationalResponse(userMessage, weatherData, temporalInfo, historicalData = null) {
-  const loc = weatherData?.location || weatherData?.cityName || historicalData?.location || "the requested location";
+function getMockWeatherConversationalResponse(userMessage, weatherData, temporalInfo, historicalData = null, forecastData = null) {
+  const loc = weatherData?.location || weatherData?.cityName || forecastData?.location || historicalData?.location || "the requested location";
   const msg = (userMessage || "").toLowerCase();
 
   if (temporalInfo?.type === "comparison" && historicalData && weatherData) {
@@ -1259,35 +1418,50 @@ function getMockWeatherConversationalResponse(userMessage, weatherData, temporal
     return `I was unable to find historical records for **${loc}** during the specified date.`;
   }
 
+  // Multi-day forecast response
+  const fc = forecastData || (weatherData?.forecast ? weatherData : null);
+  if (temporalInfo?.type === "forecast" || fc?.forecast) {
+    const fcList = fc?.forecast || [];
+    if (fcList.length > 0) {
+      const lines = fcList.map((f, i) => `• **${f.dayName} (${f.date})**: High **${f.maxTemp}°C**, Low **${f.minTemp}°C**, ${f.condition}, Rain Chance: ${f.rainProbability}%`).join("\n");
+      const note = (fc.limitedByProvider && fc.requestedDays > fc.days)
+        ? `\n\n*(Note: Weather provider supplied ${fc.days} days of forecast data).*`
+        : "";
+      return `Here is the **${fcList.length}-day forecast** for **${loc}**:\n\n${lines}${note}`;
+    }
+  }
+
   if (msg.includes("tomorrow")) {
-    const tom = weatherData.tomorrow;
-    const rainAdvice = tom.rainProbability > 40
-      ? `There is a ${tom.rainProbability}% chance of rain, so carrying an umbrella is recommended.`
-      : `Rain is unlikely (${tom.rainProbability}% chance), making it great for outdoor activities.`;
-    return `Tomorrow in **${loc}**, expect **${tom.condition.toLowerCase()}** with temperatures between **${tom.minTemp}°C** and **${tom.maxTemp}°C**. ${rainAdvice}`;
+    const tom = weatherData?.tomorrow;
+    if (tom) {
+      const rainAdvice = tom.rainProbability > 40
+        ? `There is a ${tom.rainProbability}% chance of rain, so carrying an umbrella is recommended.`
+        : `Rain is unlikely (${tom.rainProbability}% chance), making it great for outdoor activities.`;
+      return `Tomorrow in **${loc}**, expect **${tom.condition.toLowerCase()}** with temperatures between **${tom.minTemp}°C** and **${tom.maxTemp}°C**. ${rainAdvice}`;
+    }
   }
 
   if (msg.includes("travel") || msg.includes("safe") || msg.includes("go out")) {
-    const isRainy = weatherData.rainProbability >= 50;
+    const isRainy = weatherData?.rainProbability >= 50;
     const advice = isRainy
       ? `It might be tricky for outdoor travel today as there is a **${weatherData.rainProbability}% chance of rain** with **${weatherData.condition.toLowerCase()}**.`
       : `Conditions look good for travel! It is currently **${weatherData.condition.toLowerCase()}** at **${weatherData.temperature}°C** with only a **${weatherData.rainProbability}% chance of rain**.`;
-    return `In **${loc}**: ${advice} (Wind: ${weatherData.windSpeed} km/h, Humidity: ${weatherData.humidity}%).`;
+    return `In **${loc}**: ${advice} (Wind: ${weatherData?.windSpeed} km/h, Humidity: ${weatherData?.humidity}%).`;
   }
 
   if (msg.includes("temperature") || msg.includes("temp") || msg.includes("hot") || msg.includes("cold") || msg.includes("warm")) {
-    return `The current temperature in **${loc}** is **${weatherData.temperature}°C** (feels like **${weatherData.feelsLike}°C**) with **${weatherData.condition.toLowerCase()}**. Today's high will reach **${weatherData.today.maxTemp}°C** and the low will be **${weatherData.today.minTemp}°C**.`;
+    return `The current temperature in **${loc}** is **${weatherData?.temperature}°C** (feels like **${weatherData?.feelsLike}°C**) with **${weatherData?.condition.toLowerCase()}**. Today's high will reach **${weatherData?.today?.maxTemp}°C** and the low will be **${weatherData?.today?.minTemp}°C**.`;
   }
 
   if (msg.includes("humidity")) {
-    return `The relative humidity in **${loc}** is currently **${weatherData.humidity}%** with a temperature of **${weatherData.temperature}°C** (${weatherData.condition}).`;
+    return `The relative humidity in **${loc}** is currently **${weatherData?.humidity}%** with a temperature of **${weatherData?.temperature}°C** (${weatherData?.condition}).`;
   }
 
   if (msg.includes("wind")) {
-    return `The wind speed in **${loc}** is currently **${weatherData.windSpeed} km/h** with **${weatherData.condition.toLowerCase()}** conditions.`;
+    return `The wind speed in **${loc}** is currently **${weatherData?.windSpeed} km/h** with **${weatherData?.condition.toLowerCase()}** conditions.`;
   }
 
-  return `${loc} is currently ${weatherData.temperature}°C with ${weatherData.condition.toLowerCase()} conditions. Humidity is ${weatherData.humidity}%, pressure is ${weatherData.pressure || 1013} hPa, and wind speed is ${weatherData.windSpeed} km/h. Today's high is ${weatherData.today.maxTemp}°C and low is ${weatherData.today.minTemp}°C.`;
+  return `${loc} is currently ${weatherData?.temperature}°C with ${weatherData?.condition.toLowerCase()} conditions. Humidity is ${weatherData?.humidity}%, pressure is ${weatherData?.pressure || 1013} hPa, and wind speed is ${weatherData?.windSpeed} km/h. Today's high is ${weatherData?.today?.maxTemp}°C and low is ${weatherData?.today?.minTemp}°C.`;
 }
 
 module.exports = {

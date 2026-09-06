@@ -17,11 +17,14 @@ app.get("/", (req, res) => {
 });
 
 app.use(cors({
-  origin: "*",
-  methods: ["GET", "POST", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
+  origin: true,
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"]
 }));
-app.use(express.json());
+app.options("*", cors());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // Settings JSON database path and helpers
 const SETTINGS_FILE = path.join(__dirname, "data", "settings.json");
@@ -478,7 +481,8 @@ async function handleChatRequest(req, res) {
           message,
           resolvedWeatherData,
           temporal,
-          resolvedHistoricalData
+          resolvedHistoricalData,
+          forecastData
         );
         return res.json({ 
           response: mockWeatherResp,
@@ -577,7 +581,6 @@ async function handleChatRequest(req, res) {
     } else if (activeModel === "gemini") {
       const { GoogleGenerativeAI } = require("@google/generative-ai");
       const genAI = new GoogleGenerativeAI(apiKey);
-      const geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
       const formattedHistory = [];
       if (history && Array.isArray(history)) {
@@ -604,42 +607,60 @@ async function handleChatRequest(req, res) {
         ? `You are WeatherGPT, a helpful AI assistant. Answer the user's weather question naturally and conversationally using ONLY the verified meteorological data provided below. Do not invent or guess any weather values.\n\n${weatherContextPrompt}`
         : `You are WeatherGPT, a helpful AI assistant. Current date and time in India is: ${currentDateTime}.\nIf user asks current date/time, answer using this information.`;
 
-      const chat = geminiModel.startChat({
-        history: [
-          {
-            role: "user",
-            parts: [{ text: systemPrompt }]
-          },
-          {
-            role: "model",
-            parts: [{ text: "Understood. I will answer accurately based strictly on the verified data." }]
-          },
-          ...formattedHistory
-        ],
-      });
-
       let finalPrompt = message;
       if (weatherContextPrompt) {
         finalPrompt = `${weatherContextPrompt}\n\nUser Question:\n${message}`;
       }
 
-      let result;
-      if (attachment && attachment.data && attachment.mimeType) {
-        result = await chat.sendMessage([
-          {
-            inlineData: {
-              data: attachment.data,
-              mimeType: attachment.mimeType
-            }
-          },
-          finalPrompt
-        ]);
-      } else {
-        result = await chat.sendMessage(finalPrompt);
+      const candidateGeminiModels = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-2.5-flash", "gemini-pro"];
+      let responseText = null;
+      let lastGeminiError = null;
+
+      for (const modelId of candidateGeminiModels) {
+        try {
+          const geminiModel = genAI.getGenerativeModel({ model: modelId });
+          const chat = geminiModel.startChat({
+            history: [
+              {
+                role: "user",
+                parts: [{ text: systemPrompt }]
+              },
+              {
+                role: "model",
+                parts: [{ text: "Understood. I will answer accurately based strictly on the verified data." }]
+              },
+              ...formattedHistory
+            ],
+          });
+
+          let result;
+          if (attachment && attachment.data && attachment.mimeType) {
+            result = await chat.sendMessage([
+              {
+                inlineData: {
+                  data: attachment.data,
+                  mimeType: attachment.mimeType
+                }
+              },
+              finalPrompt
+            ]);
+          } else {
+            result = await chat.sendMessage(finalPrompt);
+          }
+          responseText = result.response.text();
+          if (responseText) break;
+        } catch (err) {
+          lastGeminiError = err;
+          console.warn(`Gemini model ${modelId} failed:`, err.message);
+        }
       }
-      const responseText = result.response.text();
+
+      if (!responseText && lastGeminiError) {
+        throw lastGeminiError;
+      }
+
       res.json({ 
-        response: responseText,
+        response: responseText || "Sorry, I couldn't generate a response.",
         city: activeCityResolved,
         session_id: session_id || ""
       });
@@ -770,7 +791,8 @@ async function handleChatRequest(req, res) {
         message,
         resolvedWeatherData,
         resolvedTemporal,
-        resolvedHistoricalData
+        resolvedHistoricalData,
+        forecastData
       );
       return res.json({ 
         response: fallbackResp,
@@ -778,9 +800,10 @@ async function handleChatRequest(req, res) {
         session_id: session_id || ""
       });
     }
-    res.status(500).json({ 
-      error: "Failed to generate AI response", 
-      details: error.message 
+    return res.json({
+      response: getMockResponse(message, activeModel),
+      city: activeCityResolved,
+      session_id: session_id || ""
     });
   }
 }

@@ -297,11 +297,21 @@ export default function App() {
         })
       });
 
-      if (!response.ok) {
-        throw new Error(`Server returned error code ${response.status}`);
+      let data = null;
+      try {
+        data = await response.json();
+      } catch (jsonErr) {
+        data = null;
       }
 
-      const data = await response.json();
+      if (!response.ok) {
+        const errorDetail = data?.error || data?.details || `Server error (HTTP ${response.status})`;
+        throw new Error(errorDetail);
+      }
+
+      if (!data || !data.response) {
+        throw new Error("Received empty response from backend server.");
+      }
       
       // If backend resolved a different active city (e.g. user asked "What about Mumbai?"), update active city
       if (data.city && data.city !== activeCity) {
@@ -329,12 +339,17 @@ export default function App() {
       });
 
     } catch (error) {
-      console.error("Failed to connect to backend REST API:", error);
+      console.error("API error:", error);
       
+      const isNetworkError = error.name === "TypeError" || (error.message && (error.message.includes("Failed to fetch") || error.message.includes("NetworkError") || error.message.includes("network")));
+      const errorContent = isNetworkError
+        ? `⚠️ **Connection Error**\n\nFailed to connect to the backend server at \`${BACKEND_URL}\`.\n\nPlease verify that the backend server is running (\`npm run dev\` or \`npm start\` in \`backend\`).`
+        : `⚠️ **Server Error**\n\n${error.message || "An unexpected error occurred while generating the response."}`;
+
       const errorMessage = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: `⚠️ **Connection Error**\n\nFailed to connect to the backend server at \`${BACKEND_URL}\`.\n\nPlease verify that the backend server is running (\`npm run dev\` or \`npm start\` in \`backend\`).`,
+        content: errorContent,
         timestamp: new Date().toISOString()
       };
 
