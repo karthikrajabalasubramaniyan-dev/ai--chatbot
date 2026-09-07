@@ -265,15 +265,44 @@ export default function ChatArea({
           }
         }
 
-        // 3. Fallback to direct client reverse-geocoding service (BigDataCloud / OSM)
+        // 3. Fallback to direct client reverse-geocoding service (OSM Nominatim / BigDataCloud)
+        if (!detectedCity || detectedCity === "Current Location") {
+          try {
+            const osmRes = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1&zoom=18`, {
+              headers: { "Accept": "application/json" }
+            });
+            if (osmRes.ok) {
+              const osmData = await osmRes.json();
+              if (osmData && osmData.address) {
+                const a = osmData.address;
+                const candidate = a.village || a.hamlet || a.town || a.city_district || a.district || a.suburb || a.quarter || a.neighbourhood || a.city || a.municipality;
+                if (candidate) {
+                  detectedCity = candidate.replace(/^(Zone\s+\d+|Ward\s+\d+)\s*[-:]?\s*/i, "").replace(/\s+(Corporation|Taluk|District|Mandal|Tehsil|Division\s+\d+)$/i, "").trim();
+                }
+              }
+            }
+          } catch (err) {
+            console.warn("Direct OSM reverse-geocode fallback error:", err);
+          }
+        }
+
         if (!detectedCity || detectedCity === "Current Location") {
           try {
             const bdcRes = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`);
             if (bdcRes.ok) {
               const bdcData = await bdcRes.json();
-              const name = bdcData.city || bdcData.locality || bdcData.principalSubdivision;
+              let bdcCandidate = "";
+              if (bdcData.localityInfo && Array.isArray(bdcData.localityInfo.administrative)) {
+                const sorted = [...bdcData.localityInfo.administrative]
+                  .filter(item => (!item.adminLevel || item.adminLevel > 4) && (!item.order || item.order > 8))
+                  .sort((a, b) => (b.order || 0) - (a.order || 0));
+                if (sorted.length > 0) {
+                  bdcCandidate = sorted[0].name;
+                }
+              }
+              const name = bdcCandidate || bdcData.locality || bdcData.city || bdcData.principalSubdivision;
               if (name && name !== "Current Location") {
-                detectedCity = name;
+                detectedCity = name.replace(/^(Zone\s+\d+|Ward\s+\d+)\s*[-:]?\s*/i, "").replace(/\s+(Corporation|Taluk|District|Mandal|Tehsil|Division\s+\d+)$/i, "").trim();
               }
             }
           } catch (err) {

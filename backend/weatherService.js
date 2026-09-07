@@ -642,10 +642,82 @@ async function searchLocations(query, limit = 10) {
 }
 
 /**
- * 5. Reverse-geocode coordinates to city name and location details
- * Multi-tier resolution:
- * 1. BigDataCloud reverse geocode client API (fast, free, robust worldwide and in India)
- * 2. OpenStreetMap Nominatim reverse geocode API
+ * Helper: Calculate Haversine distance in kilometers between two GPS coordinate pairs
+ */
+function calculateDistanceKm(lat1, lon1, lat2, lon2) {
+  const pLat1 = parseFloat(lat1);
+  const pLon1 = parseFloat(lon1);
+  const pLat2 = parseFloat(lat2);
+  const pLon2 = parseFloat(lon2);
+  if (isNaN(pLat1) || isNaN(pLon1) || isNaN(pLat2) || isNaN(pLon2)) return null;
+
+  const R = 6371; // Earth radius in km
+  const dLat = (pLat2 - pLat1) * Math.PI / 180;
+  const dLon = (pLon2 - pLon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(pLat1 * Math.PI / 180) * Math.cos(pLat2 * Math.PI / 180) * 
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+/**
+ * Helper: Detect administrative overlay / authority names that shouldn't be used as locality names
+ */
+function isAdministrativeOverlay(name) {
+  if (!name || typeof name !== "string") return true;
+  const n = name.toLowerCase().trim();
+  return (
+    n.includes("development authority") ||
+    n.includes("metropolitan region") ||
+    n.includes("zonal council") ||
+    n.includes("railway") ||
+    n.includes("corporation limited") ||
+    n.includes("water supply") ||
+    n.includes("sewerage board") ||
+    /^ward\s+\d+$/i.test(n) ||
+    /^zone\s+\d+$/i.test(n) ||
+    /^division\s+\d+$/i.test(n)
+  );
+}
+
+/**
+ * Helper: Clean locality name by removing administrative prefixes/suffixes
+ */
+function cleanLocalityName(name) {
+  if (!name || typeof name !== "string") return "";
+  let clean = name.trim();
+  // Remove "Zone XX ", "Ward XX "
+  clean = clean.replace(/^(Zone\s+\d+|Ward\s+\d+)\s*[-:]?\s*/i, "");
+  // Remove trailing " Corporation", " Municipality", " Taluk", " District", " Mandal", " Tehsil", " Division XX"
+  clean = clean.replace(/\s+(Corporation|Taluk|District|Mandal|Tehsil|Division\s+\d+)$/i, "");
+  clean = clean.replace(/^Division\s+\d+\s*/i, "");
+  return clean.trim();
+}
+
+const LOCALITY_TYPE_PRIORITY = {
+  village: 1,
+  town: 2,
+  city_district: 3,
+  suburb: 4,
+  quarter: 4,
+  neighbourhood: 4,
+  residential: 4,
+  locality: 4,
+  city: 5,
+  municipality: 6,
+  county: 6,
+  state_district: 7,
+  admin: 8
+};
+
+/**
+ * 5. Reverse-geocode coordinates to closest locality and location details
+ * Multi-tier resolution with distance calculation and address field preference:
+ * Preference order: village → town → city_district → suburb → city → municipality
+ * 1. BigDataCloud reverse geocode client API (granular administrative hierarchy)
+ * 2. OpenStreetMap Nominatim reverse geocode API (addressdetails=1&zoom=18)
  * 3. WeatherAPI search if key is provided
  * 4. Coordinate fallback
  */
@@ -654,94 +726,262 @@ async function reverseGeocode(latitude, longitude) {
   const lon = parseFloat(longitude);
   if (isNaN(lat) || isNaN(lon)) return null;
 
-  // 1. Try BigDataCloud reverse-geocode API
-  try {
-    const bdcUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`;
-    const data = await fetchWithRetry(bdcUrl, {}, 2, 300);
-    if (data) {
-      const cityName = data.city || data.locality || data.principalSubdivision || "";
-      const admin1 = data.principalSubdivision || "";
+  const candidates = [];
+
+  // 1. Fetch BigDataCloud reverse-geocode API
+  const fetchBdc = async () => {
+    try {
+      const bdcUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`;
+      const data = await fetchWithRetry(bdcUrl, {}, 2, 300);
+      if (!data) return;
+
+      const state = data.principalSubdivision || "";
       const country = data.countryName || "";
       const countryCode = (data.countryCode || "").toUpperCase();
-      if (cityName) {
-        return {
-          name: cityName,
-          admin1: admin1 !== cityName ? admin1 : "",
-          country: country,
-          countryCode: countryCode,
-          latitude: lat,
-          longitude: lon,
-          timezone: "auto",
-          displayName: [cityName, admin1 !== cityName ? admin1 : "", country].filter(Boolean).join(", ")
-        };
-      }
-    }
-  } catch (err) {
-    console.warn("BigDataCloud reverse geocode fallback:", err.message);
-  }
 
-  // 2. Try OpenStreetMap Nominatim
-  try {
-    const osmUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`;
-    const data = await fetchWithRetry(osmUrl, {
-      headers: { "User-Agent": "WeatherGPT/2.0" }
-    }, 2, 300);
-    if (data && data.address) {
+      // Check granular administrative entries from most specific (highest order) to broader
+      if (data.localityInfo && Array.isArray(data.localityInfo.administrative)) {
+        const sortedAdmin = [...data.localityInfo.administrative]
+          .filter(a => (!a.adminLevel || a.adminLevel > 4) && (!a.order || a.order > 8))
+          .sort((a, b) => (b.order || 0) - (a.order || 0));
+
+        for (const item of sortedAdmin) {
+          const rawName = item.name || "";
+          if (isAdministrativeOverlay(rawName)) continue;
+
+          const name = cleanLocalityName(rawName);
+          if (!name || name.length < 2 || isAdministrativeOverlay(name)) continue;
+
+          const desc = (item.description || "").toLowerCase();
+          const isDistrict = rawName.toLowerCase().includes("district") || desc.includes("district");
+          
+          let type = "suburb";
+          if (desc.includes("village") || desc.includes("hamlet")) {
+            type = "village";
+          } else if (desc.includes("town")) {
+            type = "town";
+          } else if (isDistrict) {
+            type = "state_district"; // broad administrative district
+          } else if (desc.includes("neighborhood") || desc.includes("suburb") || desc.includes("settlement")) {
+            type = "suburb";
+          } else if (desc.includes("city")) {
+            type = "city";
+          }
+
+          candidates.push({
+            name,
+            type,
+            provider: "BigDataCloud",
+            distanceKm: 0,
+            admin1: state,
+            country,
+            countryCode,
+            confidence: 0.90,
+            order: item.order || 10
+          });
+        }
+      }
+
+      if (data.locality) {
+        if (!isAdministrativeOverlay(data.locality)) {
+          const name = cleanLocalityName(data.locality);
+          if (name && name.length >= 2 && !isAdministrativeOverlay(name)) {
+            candidates.push({
+              name,
+              type: "suburb",
+              provider: "BigDataCloud",
+              distanceKm: 0,
+              admin1: state,
+              country,
+              countryCode,
+              confidence: 0.88,
+              order: 12
+            });
+          }
+        }
+      }
+
+      if (data.city) {
+        if (!isAdministrativeOverlay(data.city)) {
+          const name = cleanLocalityName(data.city);
+          if (name && name.length >= 2 && !isAdministrativeOverlay(name)) {
+            candidates.push({
+              name,
+              type: "city",
+              provider: "BigDataCloud",
+              distanceKm: 0,
+              admin1: state,
+              country,
+              countryCode,
+              confidence: 0.80,
+              order: 10
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("BigDataCloud reverse geocode fallback:", err.message);
+    }
+  };
+
+  // 2. Fetch OpenStreetMap Nominatim reverse-geocode API
+  const fetchOsm = async () => {
+    try {
+      const osmUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1&zoom=18`;
+      const data = await fetchWithRetry(osmUrl, {
+        headers: { "User-Agent": "WeatherGPT/2.0" }
+      }, 2, 300);
+
+      if (!data || !data.address) return;
       const a = data.address;
-      const cityName = a.city || a.town || a.village || a.suburb || a.state_district || a.county || a.state || "";
-      const admin1 = a.state || "";
+      const osmLat = parseFloat(data.lat);
+      const osmLon = parseFloat(data.lon);
+      const osmDist = (!isNaN(osmLat) && !isNaN(osmLon)) ? calculateDistanceKm(lat, lon, osmLat, osmLon) : null;
+      const state = a.state || "";
       const country = a.country || "";
       const countryCode = (a.country_code || "").toUpperCase();
-      if (cityName) {
-        return {
-          name: cityName,
-          admin1: admin1 !== cityName ? admin1 : "",
-          country: country,
-          countryCode: countryCode,
-          latitude: lat,
-          longitude: lon,
-          timezone: "auto",
-          displayName: [cityName, admin1 !== cityName ? admin1 : "", country].filter(Boolean).join(", ")
-        };
-      }
-    }
-  } catch (err) {
-    console.warn("OSM Nominatim reverse geocode fallback:", err.message);
-  }
 
-  // 3. Try WeatherAPI if key available
+      // Prioritize address fields: village → town → city_district → suburb → city → municipality
+      const osmFields = [
+        { key: "village", val: a.village || a.hamlet, type: "village" },
+        { key: "town", val: a.town, type: "town" },
+        { key: "city_district", val: a.city_district, type: "city_district" },
+        { key: "suburb", val: a.suburb || a.quarter || a.neighbourhood || a.residential, type: "suburb" },
+        { key: "city", val: a.city, type: "city" },
+        { key: "municipality", val: a.municipality || a.county, type: "municipality" },
+        { key: "state_district", val: a.state_district, type: "state_district" }
+      ];
+
+      for (const field of osmFields) {
+        if (!field.val || isAdministrativeOverlay(field.val)) continue;
+        const name = cleanLocalityName(field.val);
+        if (!name || name.length < 2 || isAdministrativeOverlay(name)) continue;
+
+        candidates.push({
+          name,
+          type: field.type,
+          provider: "Nominatim",
+          distanceKm: osmDist,
+          admin1: state,
+          country,
+          countryCode,
+          confidence: 0.95,
+          order: 14
+        });
+      }
+    } catch (err) {
+      console.warn("OSM Nominatim reverse geocode fallback:", err.message);
+    }
+  };
+
+  // 3. Fetch WeatherAPI search if key is available
   const apiKey = getWeatherApiKey();
-  if (apiKey) {
+  const fetchWeatherApi = async () => {
+    if (!apiKey) return;
     try {
       const url = `https://api.weatherapi.com/v1/search.json?key=${apiKey}&q=${lat},${lon}`;
       const data = await fetchWithRetry(url, {}, 2, 300);
-      if (Array.isArray(data) && data.length > 0) {
-        const r = data[0];
-        return {
-          name: r.name,
-          admin1: r.region || "",
-          country: r.country || "",
-          countryCode: r.country && r.country.toLowerCase() === "india" ? "IN" : "",
-          latitude: lat,
-          longitude: lon,
-          timezone: "auto",
-          displayName: [r.name, r.region, r.country].filter(Boolean).join(", ")
-        };
+      if (Array.isArray(data)) {
+        for (const item of data) {
+          if (isAdministrativeOverlay(item.name)) continue;
+          const dist = calculateDistanceKm(lat, lon, item.lat, item.lon);
+          const name = cleanLocalityName(item.name);
+          if (name && name.length >= 2 && !isAdministrativeOverlay(name)) {
+            candidates.push({
+              name,
+              type: "city",
+              provider: "WeatherAPI",
+              distanceKm: dist,
+              admin1: item.region || "",
+              country: item.country || "",
+              countryCode: item.country && item.country.toLowerCase() === "india" ? "IN" : "",
+              confidence: 0.75,
+              order: 10
+            });
+          }
+        }
       }
     } catch (err) {
       // Ignore
     }
+  };
+
+  await Promise.all([fetchBdc(), fetchOsm(), fetchWeatherApi()]);
+
+  // If no candidates found, fallback to coordinate pair
+  if (candidates.length === 0) {
+    return {
+      name: `${lat.toFixed(2)}, ${lon.toFixed(2)}`,
+      admin1: "",
+      country: "",
+      countryCode: "",
+      latitude: lat,
+      longitude: lon,
+      timezone: "auto",
+      displayName: `${lat.toFixed(2)}, ${lon.toFixed(2)}`
+    };
   }
 
+  // Deduplicate candidates preserving best priority and confidence
+  const uniqueMap = new Map();
+  for (const c of candidates) {
+    const key = c.name.toLowerCase();
+    const existing = uniqueMap.get(key);
+    if (!existing) {
+      uniqueMap.set(key, c);
+    } else {
+      const pOld = LOCALITY_TYPE_PRIORITY[existing.type] || 99;
+      const pNew = LOCALITY_TYPE_PRIORITY[c.type] || 99;
+      if (pNew < pOld || (pNew === pOld && (c.order || 0) > (existing.order || 0))) {
+        uniqueMap.set(key, { ...existing, ...c, type: c.type });
+      }
+    }
+  }
+
+  const uniqueCandidates = Array.from(uniqueMap.values());
+
+  // Score candidate localities based on priority hierarchy and geographical distance
+  const scored = uniqueCandidates.map(c => {
+    const typeRank = LOCALITY_TYPE_PRIORITY[c.type] || 99;
+    let score = (10 - typeRank) * 10; // 10..90
+    if (c.provider === "Nominatim") score += 5;
+    if (c.order) score += Math.min(c.order, 15);
+
+    // Apply distance scoring and thresholds
+    if (c.distanceKm !== null && c.distanceKm !== undefined) {
+      if (c.distanceKm <= 5) {
+        score += 15;
+      } else if (c.distanceKm <= 15) {
+        score += 5;
+      } else if (c.distanceKm > 30) {
+        score -= 25; // Significant penalty for distant locality
+      } else if (c.distanceKm > 45) {
+        score -= 40;
+      }
+    }
+    return { ...c, score, typeRank };
+  });
+
+  scored.sort((a, b) => b.score - a.score || a.typeRank - b.typeRank);
+
+  const best = scored[0];
+  const admin1 = best.admin1 || "";
+  const country = best.country || "";
+  const countryCode = best.countryCode || "";
+  const displayName = [best.name, admin1 && admin1 !== best.name ? admin1 : "", country].filter(Boolean).join(", ");
+
   return {
-    name: `${lat.toFixed(2)}, ${lon.toFixed(2)}`,
-    admin1: "",
-    country: "",
-    countryCode: "",
+    name: best.name,
+    admin1: admin1 !== best.name ? admin1 : "",
+    country: country,
+    countryCode: countryCode,
     latitude: lat,
     longitude: lon,
     timezone: "auto",
-    displayName: `${lat.toFixed(2)}, ${lon.toFixed(2)}`
+    displayName: displayName,
+    localityType: best.type,
+    distanceKm: best.distanceKm != null ? Math.round(best.distanceKm * 10) / 10 : null,
+    provider: best.provider
   };
 }
 
