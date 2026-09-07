@@ -41,7 +41,11 @@ export default function App() {
 
   // Active City state for WeatherGPT
   const [activeCity, setActiveCity] = useState(() => {
-    return localStorage.getItem("weathergpt_active_city") || "Chennai";
+    const saved = localStorage.getItem("weathergpt_active_city");
+    if (!saved || saved === "Current Location" || saved === "undefined" || saved === "null") {
+      return "Chennai";
+    }
+    return saved;
   });
 
   const [currentConversationId, setCurrentConversationId] = useState(() => {
@@ -130,7 +134,7 @@ export default function App() {
 
   // Sync active city to localStorage
   useEffect(() => {
-    if (activeCity) {
+    if (activeCity && activeCity !== "Current Location") {
       localStorage.setItem("weathergpt_active_city", activeCity);
     }
   }, [activeCity]);
@@ -190,7 +194,7 @@ export default function App() {
   const handleCityChange = (newCity) => {
     if (!newCity || typeof newCity !== "string") return;
     const cleanCity = newCity.trim();
-    if (cleanCity) {
+    if (cleanCity && cleanCity !== "Current Location") {
       setActiveCity(cleanCity);
     }
   };
@@ -282,6 +286,8 @@ export default function App() {
         }
       }
 
+      const cityPayload = (activeCity && activeCity !== "Current Location") ? activeCity : "Chennai";
+
       const response = await fetch(BACKEND_URL, {
         method: "POST",
         headers: {
@@ -289,7 +295,7 @@ export default function App() {
         },
         body: JSON.stringify({
           message: promptMessage,
-          city: activeCity,
+          city: cityPayload,
           history: apiHistory,
           session_id: targetConvId,
           model: selectedModel,
@@ -314,7 +320,7 @@ export default function App() {
       }
       
       // If backend resolved a different active city (e.g. user asked "What about Mumbai?"), update active city
-      if (data.city && data.city !== activeCity) {
+      if (data.city && data.city !== "Current Location" && data.city !== activeCity) {
         setActiveCity(data.city);
       }
 

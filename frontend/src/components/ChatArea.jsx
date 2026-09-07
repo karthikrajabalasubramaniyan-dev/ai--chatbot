@@ -83,7 +83,8 @@ export default function ChatArea({
   const [isGeoLoading, setIsGeoLoading] = useState(false);
   const [recentLocations, setRecentLocations] = useState(() => {
     const saved = localStorage.getItem("weathergpt_recent_locations");
-    return saved ? JSON.parse(saved) : ["Chennai", "Coimbatore", "Madurai", "Bengaluru", "Mumbai"];
+    const parsed = saved ? JSON.parse(saved) : ["Chennai", "Coimbatore", "Madurai", "Bengaluru", "Mumbai"];
+    return parsed.filter(item => item && item !== "Current Location");
   });
 
   const [cityWeatherSummary, setCityWeatherSummary] = useState(null);
@@ -110,14 +111,16 @@ export default function ChatArea({
 
   // Sync histCity with activeCity
   useEffect(() => {
-    setHistCity(activeCity);
+    if (activeCity && activeCity !== "Current Location") {
+      setHistCity(activeCity);
+    }
   }, [activeCity]);
 
   // Save recent locations to localStorage
   const saveRecentLocation = (loc) => {
-    if (!loc) return;
+    if (!loc || loc === "Current Location") return;
     setRecentLocations(prev => {
-      const filtered = prev.filter(item => item.toLowerCase() !== loc.toLowerCase());
+      const filtered = prev.filter(item => item.toLowerCase() !== loc.toLowerCase() && item !== "Current Location");
       const updated = [loc, ...filtered].slice(0, 8);
       localStorage.setItem("weathergpt_recent_locations", JSON.stringify(updated));
       return updated;
@@ -153,7 +156,7 @@ export default function ChatArea({
   useEffect(() => {
     let isCancelled = false;
     const fetchCityWeather = async () => {
-      if (!activeCity) return;
+      if (!activeCity || activeCity === "Current Location") return;
       try {
         const res = await fetch(`${API_BASE}/api/v1/weather/current?city=${encodeURIComponent(activeCity)}`);
         if (res.ok) {
@@ -182,7 +185,8 @@ export default function ChatArea({
     setActiveWeatherTab("forecast");
     setIsForecastLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/v1/weather/forecast?city=${encodeURIComponent(activeCity)}&days=7`);
+      const cityQuery = (activeCity && activeCity !== "Current Location") ? activeCity : "Chennai";
+      const res = await fetch(`${API_BASE}/api/v1/weather/forecast?city=${encodeURIComponent(cityQuery)}&days=7`);
       if (res.ok) {
         const data = await res.json();
         setForecastData(data);
@@ -197,12 +201,13 @@ export default function ChatArea({
   // Fetch historical weather
   const handleFetchHistory = async (e) => {
     if (e) e.preventDefault();
-    if (!histCity || !histStartDate || !histEndDate) return;
+    const targetCity = (histCity && histCity !== "Current Location") ? histCity : ((activeCity && activeCity !== "Current Location") ? activeCity : "Chennai");
+    if (!targetCity || !histStartDate || !histEndDate) return;
     setIsHistLoading(true);
     setHistError(null);
     try {
       const res = await fetch(
-        `${API_BASE}/api/v1/weather/history?city=${encodeURIComponent(histCity)}&start_date=${histStartDate}&end_date=${histEndDate}`
+        `${API_BASE}/api/v1/weather/history?city=${encodeURIComponent(targetCity)}&start_date=${histStartDate}&end_date=${histEndDate}`
       );
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
@@ -228,25 +233,76 @@ export default function ChatArea({
       async (pos) => {
         const lat = pos.coords.latitude;
         const lon = pos.coords.longitude;
+        let detectedCity = "";
+
+        // 1. Try reverse geocoding via backend API
         try {
-          const res = await fetch(`${API_BASE}/api/v1/weather/current?city=${lat},${lon}`);
-          if (res.ok) {
-            const data = await res.json();
-            const resolved = data.cityName || data.location || `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
-            handleCitySelect(resolved);
+          const revRes = await fetch(`${API_BASE}/api/v1/weather/reverse-geocode?lat=${lat}&lon=${lon}`);
+          if (revRes.ok) {
+            const revData = await revRes.json();
+            if (revData && revData.name && revData.name !== "Current Location") {
+              detectedCity = revData.name;
+            }
           }
         } catch (err) {
-          console.warn("Reverse location error:", err);
+          console.warn("Backend reverse-geocode error:", err);
+        }
+
+        // 2. If not yet resolved, try current weather endpoint with lat,lon
+        if (!detectedCity || detectedCity === "Current Location") {
+          try {
+            const curRes = await fetch(`${API_BASE}/api/v1/weather/current?city=${lat},${lon}`);
+            if (curRes.ok) {
+              const curData = await curRes.json();
+              if (curData && curData.cityName && curData.cityName !== "Current Location") {
+                detectedCity = curData.cityName;
+              } else if (curData && curData.location && !curData.location.includes("Current Location")) {
+                detectedCity = curData.location.split(",")[0].trim();
+              }
+            }
+          } catch (err) {
+            console.warn("Current weather coordinates lookup error:", err);
+          }
+        }
+
+        // 3. Fallback to direct client reverse-geocoding service (BigDataCloud / OSM)
+        if (!detectedCity || detectedCity === "Current Location") {
+          try {
+            const bdcRes = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`);
+            if (bdcRes.ok) {
+              const bdcData = await bdcRes.json();
+              const name = bdcData.city || bdcData.locality || bdcData.principalSubdivision;
+              if (name && name !== "Current Location") {
+                detectedCity = name;
+              }
+            }
+          } catch (err) {
+            console.warn("Direct BDC reverse-geocode fallback error:", err);
+          }
+        }
+
+        setIsGeoLoading(false);
+
+        if (detectedCity && detectedCity !== "Current Location") {
+          handleCitySelect(detectedCity);
+        } else {
+          // If all reverse-geocoding fails to produce a named city, use the coordinate pair
           handleCitySelect(`${lat.toFixed(2)}, ${lon.toFixed(2)}`);
-        } finally {
-          setIsGeoLoading(false);
         }
       },
       (err) => {
         setIsGeoLoading(false);
-        alert("Unable to retrieve your location. Please check location permissions.");
+        let errorMsg = "Unable to retrieve your location. Please check your browser settings or select a city manually.";
+        if (err.code === 1) { // PERMISSION_DENIED
+          errorMsg = "Location access was denied. Please allow location permissions in your browser settings to detect your current location.";
+        } else if (err.code === 2) { // POSITION_UNAVAILABLE
+          errorMsg = "Location information is currently unavailable. Please check your device GPS or network settings.";
+        } else if (err.code === 3) { // TIMEOUT
+          errorMsg = "Location request timed out. Please try again or search for your city manually.";
+        }
+        alert(errorMsg);
       },
-      { timeout: 10000, enableHighAccuracy: true }
+      { timeout: 10000, enableHighAccuracy: true, maximumAge: 60000 }
     );
   };
 
@@ -282,6 +338,10 @@ export default function ChatArea({
   const handleCitySelect = (city) => {
     if (city && city.trim()) {
       const clean = city.trim();
+      if (clean === "Current Location" || clean.toLowerCase() === "my location") {
+        handleUseMyLocation();
+        return;
+      }
       onCityChange?.(clean);
       saveRecentLocation(clean);
       setIsCityDropdownOpen(false);
@@ -292,10 +352,18 @@ export default function ChatArea({
 
   const handleCitySearchSubmit = (e) => {
     e.preventDefault();
+    const query = citySearchInput.trim();
+    if (!query) return;
+
+    if (query.toLowerCase() === "current location" || query.toLowerCase() === "my location" || query.toLowerCase() === "here") {
+      handleUseMyLocation();
+      return;
+    }
+
     if (searchResults.length > 0) {
       handleCitySelect(searchResults[0].displayName || searchResults[0].name);
-    } else if (citySearchInput.trim()) {
-      handleCitySelect(citySearchInput.trim());
+    } else {
+      handleCitySelect(query);
     }
   };
 

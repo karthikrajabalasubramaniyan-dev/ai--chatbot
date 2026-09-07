@@ -463,7 +463,7 @@ function extractLocation(message, history = [], activeCity = null, clientLocatio
     }
   }
 
-  // Pattern 4: "here" / "my location"
+  // Pattern 4: "here" / "my location" / "current location"
   if (/\b(here|my location|current location|local|where i am)\b/i.test(rawMsg)) {
     if (clientLocation && (clientLocation.city || (clientLocation.latitude && clientLocation.longitude))) {
       return {
@@ -474,9 +474,9 @@ function extractLocation(message, history = [], activeCity = null, clientLocatio
         isExplicitInQuery: true
       };
     }
-    if (activeCity) {
+    if (activeCity && typeof activeCity === "string" && !/\b(current location|my location|here)\b/i.test(activeCity.trim())) {
       return {
-        locationName: activeCity,
+        locationName: activeCity.trim(),
         source: "payload",
         isExplicitInQuery: false
       };
@@ -490,11 +490,14 @@ function extractLocation(message, history = [], activeCity = null, clientLocatio
 
   // Pattern 5: Active city passed in request payload
   if (activeCity && typeof activeCity === "string" && activeCity.trim().length > 0) {
-    return {
-      locationName: activeCity.trim(),
-      source: "payload",
-      isExplicitInQuery: false
-    };
+    const cleanCity = activeCity.trim();
+    if (!/\b(current location|my location|here)\b/i.test(cleanCity)) {
+      return {
+        locationName: cleanCity,
+        source: "payload",
+        isExplicitInQuery: false
+      };
+    }
   }
 
   // Pattern 6: Search conversation history
@@ -503,7 +506,7 @@ function extractLocation(message, history = [], activeCity = null, clientLocatio
       const item = history[i];
       if (item && item.role === "user" && item.content) {
         const extracted = extractLocation(item.content, [], null, null);
-        if (extracted && extracted.locationName && extracted.isExplicitInQuery) {
+        if (extracted && extracted.locationName && extracted.isExplicitInQuery && !/\b(current location|my location|here)\b/i.test(extracted.locationName)) {
           return {
             locationName: extracted.locationName,
             source: "history",
@@ -523,7 +526,9 @@ function extractLocation(message, history = [], activeCity = null, clientLocatio
 }
 
 function getWeatherApiKey() {
-  return (process.env.WEATHER_API_KEY || "").trim();
+  const key = (process.env.WEATHER_API_KEY || "").trim();
+  if (!key || key === "your_weatherapi_key_here" || key === "your_api_key_here") return "";
+  return key;
 }
 
 function sanitizeError(str) {
@@ -531,7 +536,7 @@ function sanitizeError(str) {
   return str.replace(/key=[a-zA-Z0-9_-]+/gi, "key=[REDACTED]");
 }
 
-async function fetchWithRetry(url, options = {}, retries = 3, backoffMs = 400) {
+async function fetchWithRetry(url, options = {}, retries = 2, backoffMs = 300) {
   const defaultHeaders = {
     "User-Agent": "WeatherGPT/2.0 (Meteorological Client)"
   };
@@ -548,11 +553,16 @@ async function fetchWithRetry(url, options = {}, retries = 3, backoffMs = 400) {
       const response = await fetch(url, mergedOptions);
       if (!response.ok) {
         const errorBody = await response.text().catch(() => "");
-        throw new Error(`HTTP ${response.status}: ${sanitizeError(errorBody)}`);
+        const err = new Error(`HTTP ${response.status}: ${sanitizeError(errorBody)}`);
+        if (response.status >= 400 && response.status < 500) {
+          throw err;
+        }
+        if (attempt === retries) throw err;
+      } else {
+        return await response.json();
       }
-      return await response.json();
     } catch (err) {
-      if (attempt === retries) {
+      if (attempt === retries || (err.message && err.message.startsWith("HTTP 4"))) {
         throw new Error(sanitizeError(err.message));
       }
       await new Promise(res => setTimeout(res, backoffMs * attempt));
@@ -632,25 +642,140 @@ async function searchLocations(query, limit = 10) {
 }
 
 /**
- * 5. Geocode location name to coordinates (Prioritizes Indian matches when ambiguous)
+ * 5. Reverse-geocode coordinates to city name and location details
+ * Multi-tier resolution:
+ * 1. BigDataCloud reverse geocode client API (fast, free, robust worldwide and in India)
+ * 2. OpenStreetMap Nominatim reverse geocode API
+ * 3. WeatherAPI search if key is provided
+ * 4. Coordinate fallback
+ */
+async function reverseGeocode(latitude, longitude) {
+  const lat = parseFloat(latitude);
+  const lon = parseFloat(longitude);
+  if (isNaN(lat) || isNaN(lon)) return null;
+
+  // 1. Try BigDataCloud reverse-geocode API
+  try {
+    const bdcUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`;
+    const data = await fetchWithRetry(bdcUrl, {}, 2, 300);
+    if (data) {
+      const cityName = data.city || data.locality || data.principalSubdivision || "";
+      const admin1 = data.principalSubdivision || "";
+      const country = data.countryName || "";
+      const countryCode = (data.countryCode || "").toUpperCase();
+      if (cityName) {
+        return {
+          name: cityName,
+          admin1: admin1 !== cityName ? admin1 : "",
+          country: country,
+          countryCode: countryCode,
+          latitude: lat,
+          longitude: lon,
+          timezone: "auto",
+          displayName: [cityName, admin1 !== cityName ? admin1 : "", country].filter(Boolean).join(", ")
+        };
+      }
+    }
+  } catch (err) {
+    console.warn("BigDataCloud reverse geocode fallback:", err.message);
+  }
+
+  // 2. Try OpenStreetMap Nominatim
+  try {
+    const osmUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`;
+    const data = await fetchWithRetry(osmUrl, {
+      headers: { "User-Agent": "WeatherGPT/2.0" }
+    }, 2, 300);
+    if (data && data.address) {
+      const a = data.address;
+      const cityName = a.city || a.town || a.village || a.suburb || a.state_district || a.county || a.state || "";
+      const admin1 = a.state || "";
+      const country = a.country || "";
+      const countryCode = (a.country_code || "").toUpperCase();
+      if (cityName) {
+        return {
+          name: cityName,
+          admin1: admin1 !== cityName ? admin1 : "",
+          country: country,
+          countryCode: countryCode,
+          latitude: lat,
+          longitude: lon,
+          timezone: "auto",
+          displayName: [cityName, admin1 !== cityName ? admin1 : "", country].filter(Boolean).join(", ")
+        };
+      }
+    }
+  } catch (err) {
+    console.warn("OSM Nominatim reverse geocode fallback:", err.message);
+  }
+
+  // 3. Try WeatherAPI if key available
+  const apiKey = getWeatherApiKey();
+  if (apiKey) {
+    try {
+      const url = `https://api.weatherapi.com/v1/search.json?key=${apiKey}&q=${lat},${lon}`;
+      const data = await fetchWithRetry(url, {}, 2, 300);
+      if (Array.isArray(data) && data.length > 0) {
+        const r = data[0];
+        return {
+          name: r.name,
+          admin1: r.region || "",
+          country: r.country || "",
+          countryCode: r.country && r.country.toLowerCase() === "india" ? "IN" : "",
+          latitude: lat,
+          longitude: lon,
+          timezone: "auto",
+          displayName: [r.name, r.region, r.country].filter(Boolean).join(", ")
+        };
+      }
+    } catch (err) {
+      // Ignore
+    }
+  }
+
+  return {
+    name: `${lat.toFixed(2)}, ${lon.toFixed(2)}`,
+    admin1: "",
+    country: "",
+    countryCode: "",
+    latitude: lat,
+    longitude: lon,
+    timezone: "auto",
+    displayName: `${lat.toFixed(2)}, ${lon.toFixed(2)}`
+  };
+}
+
+/**
+ * 6. Geocode location name to coordinates (Prioritizes Indian matches when ambiguous)
  */
 async function geocodeLocation(locationName) {
   if (!locationName) return null;
   const cleanName = locationName.trim();
 
-  // If already coordinates "lat,lon"
+  // If already coordinates "lat,lon" -> reverse-geocode to real city name
   const coordMatch = cleanName.match(/^(-?\d+(\.\d+)?),\s*(-?\d+(\.\d+)?)$/);
   if (coordMatch) {
+    const lat = parseFloat(coordMatch[1]);
+    const lon = parseFloat(coordMatch[3]);
+    const rev = await reverseGeocode(lat, lon);
+    if (rev) return rev;
+
     return {
-      name: "Current Location",
+      name: `${coordMatch[1]}, ${coordMatch[3]}`,
       admin1: "",
       country: "",
       countryCode: "",
-      latitude: parseFloat(coordMatch[1]),
-      longitude: parseFloat(coordMatch[3]),
+      latitude: lat,
+      longitude: lon,
       timezone: "auto",
       displayName: `${coordMatch[1]}, ${coordMatch[3]}`
     };
+  }
+
+  // If literal "Current Location" or "My Location" or "Here" was passed without coordinates
+  if (/\b(current location|my location|here)\b/i.test(cleanName)) {
+    // Fallback to default location
+    return geocodeLocation("Chennai");
   }
 
   const apiKey = getWeatherApiKey();
@@ -1470,6 +1595,7 @@ module.exports = {
   extractLocation,
   searchLocations,
   geocodeLocation,
+  reverseGeocode,
   fetchCurrentWeatherData,
   fetchForecastWeatherData,
   fetchHourlyWeatherData,

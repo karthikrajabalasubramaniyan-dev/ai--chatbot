@@ -314,6 +314,26 @@ app.get(["/api/v1/weather/search", "/api/weather/search"], async (req, res) => {
   }
 });
 
+// 6. Reverse Geocode Endpoint: GET /api/v1/weather/reverse-geocode & GET /api/weather/reverse-geocode
+app.get(["/api/v1/weather/reverse-geocode", "/api/weather/reverse-geocode", "/api/v1/weather/reverse", "/api/weather/reverse"], async (req, res) => {
+  const lat = req.query.lat || req.query.latitude;
+  const lon = req.query.lon || req.query.longitude || req.query.lng;
+  if (!lat || !lon) {
+    return res.status(400).json({ error: "lat and lon parameters are required" });
+  }
+
+  try {
+    const geo = await weatherService.reverseGeocode(lat, lon);
+    if (!geo) {
+      return res.status(404).json({ error: "Location could not be reverse-geocoded" });
+    }
+    res.json(geo);
+  } catch (err) {
+    console.error("Reverse geocode endpoint error:", err);
+    res.status(500).json({ error: "Failed to reverse geocode", details: err.message });
+  }
+});
+
 // General Weather API endpoint (backwards compatible)
 app.get(["/api/v1/weather", "/api/weather"], async (req, res) => {
   const { city, location, start_date, end_date, days, hours } = req.query;
