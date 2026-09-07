@@ -505,7 +505,15 @@ async function generateGeminiResponse(apiKey, { weatherContextPrompt, message, h
     finalPrompt = `${weatherContextPrompt}\n\nUser Question:\n${message}`;
   }
 
-  const candidateGeminiModels = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-2.5-flash", "gemini-pro"];
+  const candidateGeminiModels = [
+    "gemini-2.5-flash",
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-latest",
+    "gemini-2.0-flash",
+    "gemini-1.5-pro",
+    "gemini-1.5-pro-latest",
+    "gemini-pro"
+  ];
   let responseText = null;
   let lastGeminiError = null;
 
