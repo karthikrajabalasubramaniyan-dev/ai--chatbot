@@ -86,16 +86,48 @@ function writeSettings(settings) {
   }
 }
 
-function maskKey(key) {
-  if (!key) return "";
-  if (
-    key === "your_gemini_api_key_here" ||
-    key === "your_groq_api_key_here" ||
-    key === "your_openai_api_key_here" ||
-    key === "your_claude_api_key_here"
-  ) {
-    return "";
+function sanitizeError(str) {
+  if (!str || typeof str !== "string") return "";
+  return str
+    .replace(/Bearer\s+[a-zA-Z0-9_\-\.]+/gi, "Bearer [REDACTED]")
+    .replace(/x-api-key["':\s]+[a-zA-Z0-9_\-\.]+/gi, "x-api-key: [REDACTED]")
+    .replace(/key=[a-zA-Z0-9_\-\.]+/gi, "key=[REDACTED]")
+    .replace(/sk-[a-zA-Z0-9_\-\.]{15,}/gi, "sk-[REDACTED]")
+    .replace(/gsk_[a-zA-Z0-9_\-\.]{15,}/gi, "gsk-[REDACTED]")
+    .replace(/AIza[a-zA-Z0-9_\-\.]{15,}/gi, "AIza[REDACTED]");
+}
+
+function resolveApiKey(model, settings = null) {
+  const currentSettings = settings || readSettings();
+  const m = (model || "").toLowerCase();
+  if (m === "gemini") {
+    return currentSettings.apiKeys.gemini || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "";
+  } else if (m === "groq") {
+    return currentSettings.apiKeys.groq || process.env.GROQ_API_KEY || "";
+  } else if (m === "openai") {
+    return currentSettings.apiKeys.openai || process.env.OPENAI_API_KEY || "";
+  } else if (m === "claude" || m === "anthropic") {
+    return currentSettings.apiKeys.claude || process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY || "";
   }
+  return "";
+}
+
+function isPlaceholderKey(key) {
+  if (!key || typeof key !== "string") return true;
+  const trimmed = key.trim();
+  return (
+    !trimmed ||
+    trimmed === "your_gemini_api_key_here" ||
+    trimmed === "your_google_api_key_here" ||
+    trimmed === "your_groq_api_key_here" ||
+    trimmed === "your_openai_api_key_here" ||
+    trimmed === "your_claude_api_key_here" ||
+    trimmed === "your_anthropic_api_key_here"
+  );
+}
+
+function maskKey(key) {
+  if (isPlaceholderKey(key)) return "";
   if (key.length <= 8) return "••••••••";
   return `${key.slice(0, 4)}...${key.slice(-4)}`;
 }
@@ -108,9 +140,17 @@ function isMasked(key) {
 // Health check
 app.get(["/api/health", "/api/v1/health"], (req, res) => {
   const settings = readSettings();
-  const geminiKey = settings.apiKeys.gemini || process.env.GEMINI_API_KEY;
-  const groqKey = settings.apiKeys.groq || process.env.GROQ_API_KEY;
-  const isLive = Boolean((geminiKey && geminiKey !== "your_gemini_api_key_here") || (groqKey && groqKey !== "your_groq_api_key_here"));
+  const geminiKey = resolveApiKey("gemini", settings);
+  const groqKey = resolveApiKey("groq", settings);
+  const openaiKey = resolveApiKey("openai", settings);
+  const claudeKey = resolveApiKey("claude", settings);
+
+  const isLive = Boolean(
+    !isPlaceholderKey(geminiKey) ||
+    !isPlaceholderKey(groqKey) ||
+    !isPlaceholderKey(openaiKey) ||
+    !isPlaceholderKey(claudeKey)
+  );
   res.json({ status: "ok", mode: isLive ? "live" : "mock" });
 });
 
@@ -118,10 +158,10 @@ app.get(["/api/health", "/api/v1/health"], (req, res) => {
 app.get(["/api/settings", "/api/v1/settings"], (req, res) => {
   const settings = readSettings();
   
-  const geminiKey = settings.apiKeys.gemini || process.env.GEMINI_API_KEY || "";
-  const groqKey = settings.apiKeys.groq || process.env.GROQ_API_KEY || "";
-  const openaiKey = settings.apiKeys.openai || process.env.OPENAI_API_KEY || "";
-  const claudeKey = settings.apiKeys.claude || process.env.CLAUDE_API_KEY || "";
+  const geminiKey = resolveApiKey("gemini", settings);
+  const groqKey = resolveApiKey("groq", settings);
+  const openaiKey = resolveApiKey("openai", settings);
+  const claudeKey = resolveApiKey("claude", settings);
 
   res.json({
     defaultModel: settings.defaultModel,
@@ -366,6 +406,361 @@ app.get(["/api/v1/weather", "/api/weather"], async (req, res) => {
 });
 
 // -------------------------------------------------------------
+// AI PROVIDER GENERATION FUNCTIONS
+// -------------------------------------------------------------
+
+async function generateGroqResponse(apiKey, { weatherContextPrompt, message, history }) {
+  const Groq = require("groq-sdk");
+  const groq = new Groq({ apiKey });
+
+  const messages = [
+    {
+      role: "system",
+      content: weatherContextPrompt
+        ? `You are WeatherGPT, a helpful weather and AI assistant. Answer accurately and conversationally using ONLY the verified meteorological data provided below. NEVER invent, hallucinate, or estimate numbers.\n\n${weatherContextPrompt}`
+        : "You are WeatherGPT, a helpful AI assistant. Answer clearly, concisely, and accurately."
+    }
+  ];
+
+  if (history && Array.isArray(history)) {
+    history.forEach(item => {
+      if (item && item.content) {
+        messages.push({
+          role: item.role === "assistant" ? "assistant" : "user",
+          content: item.content
+        });
+      }
+    });
+  }
+
+  let userPrompt = message;
+  if (weatherContextPrompt) {
+    userPrompt = `${weatherContextPrompt}\n\nUser Question: ${message}`;
+  }
+
+  messages.push({
+    role: "user",
+    content: userPrompt
+  });
+
+  const candidateModels = ["openai/gpt-oss-20b", "openai/gpt-oss-120b", "qwen/qwen3.8-27b", "groq/compound", "groq/compound-mini"];
+  let completion = null;
+  let lastError = null;
+
+  for (const modelId of candidateModels) {
+    try {
+      completion = await groq.chat.completions.create({
+        model: modelId,
+        messages,
+        temperature: 0.5,
+        max_tokens: 1024
+      });
+      if (completion?.choices?.[0]?.message?.content) break;
+    } catch (err) {
+      lastError = err;
+      console.warn(`Groq model ${modelId} failed:`, sanitizeError(err.message));
+    }
+  }
+
+  if (!completion && lastError) {
+    throw new Error(`Groq failed: ${sanitizeError(lastError.message)}`);
+  }
+
+  return completion?.choices?.[0]?.message?.content || "";
+}
+
+async function generateGeminiResponse(apiKey, { weatherContextPrompt, message, history, attachment }) {
+  const { GoogleGenerativeAI } = require("@google/generative-ai");
+  const genAI = new GoogleGenerativeAI(apiKey);
+
+  const formattedHistory = [];
+  if (history && Array.isArray(history)) {
+    history.forEach(item => {
+      if (item && item.content) {
+        formattedHistory.push({
+          role: item.role === "assistant" ? "model" : "user",
+          parts: [{ text: item.content }]
+        });
+      }
+    });
+  }
+
+  const now = new Date();
+  const currentDateTime = now.toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+
+  const systemPrompt = weatherContextPrompt
+    ? `You are WeatherGPT, a helpful AI assistant. Answer the user's weather question naturally and conversationally using ONLY the verified meteorological data provided below. Do not invent or guess any weather values.\n\n${weatherContextPrompt}`
+    : `You are WeatherGPT, a helpful AI assistant. Current date and time in India is: ${currentDateTime}.\nIf user asks current date/time, answer using this information.`;
+
+  let finalPrompt = message;
+  if (weatherContextPrompt) {
+    finalPrompt = `${weatherContextPrompt}\n\nUser Question:\n${message}`;
+  }
+
+  const candidateGeminiModels = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-2.5-flash", "gemini-pro"];
+  let responseText = null;
+  let lastGeminiError = null;
+
+  for (const modelId of candidateGeminiModels) {
+    try {
+      const geminiModel = genAI.getGenerativeModel({ model: modelId });
+      const chat = geminiModel.startChat({
+        history: [
+          {
+            role: "user",
+            parts: [{ text: systemPrompt }]
+          },
+          {
+            role: "model",
+            parts: [{ text: "Understood. I will answer accurately based strictly on the verified data." }]
+          },
+          ...formattedHistory
+        ],
+      });
+
+      let result;
+      if (attachment && attachment.data && attachment.mimeType) {
+        result = await chat.sendMessage([
+          {
+            inlineData: {
+              data: attachment.data,
+              mimeType: attachment.mimeType
+            }
+          },
+          finalPrompt
+        ]);
+      } else {
+        result = await chat.sendMessage(finalPrompt);
+      }
+      responseText = result.response.text();
+      if (responseText) break;
+    } catch (err) {
+      lastGeminiError = err;
+      console.warn(`Gemini model ${modelId} failed:`, sanitizeError(err.message));
+    }
+  }
+
+  if (!responseText && lastGeminiError) {
+    throw new Error(`Gemini failed: ${sanitizeError(lastGeminiError.message)}`);
+  }
+
+  return responseText || "";
+}
+
+async function generateOpenAiResponse(apiKey, { weatherContextPrompt, message, history, attachment }) {
+  const systemPrompt = weatherContextPrompt
+    ? `You are WeatherGPT, an AI assistant. Answer using ONLY the real meteorological data provided in the prompt.\n\n${weatherContextPrompt}`
+    : "You are WeatherGPT, a helpful AI assistant. Answer clearly, concisely, and accurately.";
+
+  const messages = [
+    { role: "system", content: systemPrompt }
+  ];
+
+  if (history && Array.isArray(history)) {
+    history.forEach(item => {
+      if (item && item.content) {
+        messages.push({
+          role: item.role === "assistant" ? "assistant" : "user",
+          content: item.content
+        });
+      }
+    });
+  }
+
+  const userText = weatherContextPrompt ? `${weatherContextPrompt}\n\nUser Question:\n${message}` : message;
+
+  if (attachment && attachment.data && attachment.mimeType && attachment.mimeType.startsWith("image/")) {
+    messages.push({
+      role: "user",
+      content: [
+        { type: "text", text: userText },
+        {
+          type: "image_url",
+          image_url: {
+            url: `data:${attachment.mimeType};base64,${attachment.data}`
+          }
+        }
+      ]
+    });
+  } else {
+    messages.push({ role: "user", content: userText });
+  }
+
+  const candidateModels = ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"];
+  let responseText = null;
+  let lastError = null;
+
+  for (const modelId of candidateModels) {
+    try {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: modelId,
+          messages: messages,
+          temperature: 0.5,
+          max_tokens: 1024
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`OpenAI HTTP ${response.status}: ${sanitizeError(errorText)}`);
+      }
+
+      const data = await response.json();
+      responseText = data.choices?.[0]?.message?.content || "";
+      if (responseText) break;
+    } catch (err) {
+      lastError = err;
+      console.warn(`OpenAI model ${modelId} failed:`, sanitizeError(err.message));
+    }
+  }
+
+  if (!responseText && lastError) {
+    throw new Error(`OpenAI failed: ${sanitizeError(lastError.message)}`);
+  }
+
+  return responseText || "";
+}
+
+async function generateClaudeResponse(apiKey, { weatherContextPrompt, message, history, attachment }) {
+  const systemPrompt = weatherContextPrompt
+    ? `You are WeatherGPT, a helpful AI assistant. Answer the user's weather question naturally and conversationally using ONLY the verified meteorological data provided below. Do not invent or guess any weather values.\n\n${weatherContextPrompt}`
+    : "You are WeatherGPT, a helpful AI assistant. Answer clearly, concisely, and accurately.";
+
+  const rawMessages = [];
+  if (history && Array.isArray(history)) {
+    history.forEach(item => {
+      if (item && item.content) {
+        rawMessages.push({
+          role: item.role === "assistant" ? "assistant" : "user",
+          content: item.content
+        });
+      }
+    });
+  }
+
+  const userContent = [];
+  if (attachment && attachment.data && attachment.mimeType && attachment.mimeType.startsWith("image/")) {
+    userContent.push({
+      type: "image",
+      source: {
+        type: "base64",
+        media_type: attachment.mimeType,
+        data: attachment.data
+      }
+    });
+  }
+
+  const userTextPrompt = weatherContextPrompt
+    ? `${weatherContextPrompt}\n\nUser Question:\n${message}`
+    : message;
+
+  userContent.push({ type: "text", text: userTextPrompt });
+  rawMessages.push({ role: "user", content: userContent });
+
+  // Format messages to strictly alternate roles and ensure first message is user (Anthropic API requirement)
+  const formattedMessages = [];
+  for (let i = 0; i < rawMessages.length; i++) {
+    const m = rawMessages[i];
+    if (formattedMessages.length === 0 && m.role !== "user") {
+      continue;
+    }
+    if (formattedMessages.length > 0 && formattedMessages[formattedMessages.length - 1].role === m.role) {
+      // Merge consecutive same-role text contents
+      const prev = formattedMessages[formattedMessages.length - 1];
+      if (typeof prev.content === "string" && typeof m.content === "string") {
+        prev.content += `\n\n${m.content}`;
+      } else if (Array.isArray(prev.content) && Array.isArray(m.content)) {
+        prev.content.push(...m.content);
+      } else {
+        formattedMessages.push(m);
+      }
+    } else {
+      formattedMessages.push(m);
+    }
+  }
+
+  if (formattedMessages.length === 0) {
+    formattedMessages.push({ role: "user", content: userContent });
+  }
+
+  const candidateModels = [
+    "claude-3-5-sonnet-20241022",
+    "claude-3-5-sonnet-latest",
+    "claude-3-7-sonnet-20250219",
+    "claude-3-5-haiku-20241022",
+    "claude-3-sonnet-20240229",
+    "claude-3-haiku-20240307"
+  ];
+  let responseText = null;
+  let lastError = null;
+
+  for (const modelId of candidateModels) {
+    try {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01"
+        },
+        body: JSON.stringify({
+          model: modelId,
+          max_tokens: 1024,
+          system: systemPrompt,
+          messages: formattedMessages
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Claude HTTP ${response.status}: ${sanitizeError(errorText)}`);
+      }
+
+      const data = await response.json();
+      responseText = data.content?.[0]?.text || "";
+      if (responseText) break;
+    } catch (err) {
+      lastError = err;
+      console.warn(`Claude model ${modelId} failed:`, sanitizeError(err.message));
+    }
+  }
+
+  if (!responseText && lastError) {
+    throw new Error(`Claude failed: ${sanitizeError(lastError.message)}`);
+  }
+
+  return responseText || "";
+}
+
+async function executeAiGeneration(modelName, apiKey, payload) {
+  const m = (modelName || "").toLowerCase();
+  if (m === "groq") {
+    return await generateGroqResponse(apiKey, payload);
+  } else if (m === "gemini") {
+    return await generateGeminiResponse(apiKey, payload);
+  } else if (m === "openai") {
+    return await generateOpenAiResponse(apiKey, payload);
+  } else if (m === "claude" || m === "anthropic") {
+    return await generateClaudeResponse(apiKey, payload);
+  }
+  throw new Error(`Unsupported model: ${modelName}`);
+}
+
+// -------------------------------------------------------------
 // CHAT API HANDLER (Supports /api/v1/chat and /api/chat)
 // -------------------------------------------------------------
 async function handleChatRequest(req, res) {
@@ -376,32 +771,19 @@ async function handleChatRequest(req, res) {
   }
 
   const settings = readSettings();
-  const activeModel = model || settings.defaultModel || "groq";
+  const activeModel = (model || settings.defaultModel || "groq").toLowerCase();
 
-  // Resolve API Key
-  let apiKey = "";
-  if (activeModel === "gemini") {
-    apiKey = settings.apiKeys.gemini || process.env.GEMINI_API_KEY || "";
-  } else if (activeModel === "groq") {
-    apiKey = settings.apiKeys.groq || process.env.GROQ_API_KEY || "";
-  } else if (activeModel === "openai") {
-    apiKey = settings.apiKeys.openai || process.env.OPENAI_API_KEY || "";
-  } else if (activeModel === "claude") {
-    apiKey = settings.apiKeys.claude || process.env.CLAUDE_API_KEY || "";
-  }
-
-  const isPlaceholder =
-    !apiKey ||
-    apiKey === "your_gemini_api_key_here" ||
-    apiKey === "your_openai_api_key_here" ||
-    apiKey === "your_groq_api_key_here" ||
-    apiKey === "your_claude_api_key_here";
+  // Resolve API Key for requested model
+  const apiKey = resolveApiKey(activeModel, settings);
+  const isPlaceholder = isPlaceholderKey(apiKey);
 
   // Weather Intelligence Processing
   let weatherContextPrompt = "";
   let resolvedWeatherData = null;
   let resolvedHistoricalData = null;
   let resolvedTemporal = null;
+  let forecastData = null;
+  let hourlyData = null;
   let activeCityResolved = city || "Chennai";
 
   if (weatherService.isWeatherQuery(message)) {
@@ -431,8 +813,6 @@ async function handleChatRequest(req, res) {
       resolvedTemporal = temporal;
 
       let currentData = null;
-      let forecastData = null;
-      let hourlyData = null;
       let historicalData = null;
 
       // 1. COMPARISON INTENT
@@ -495,24 +875,31 @@ async function handleChatRequest(req, res) {
         );
       }
 
-      // If in Mock Mode (no API key configured), generate conversational answer using real API data directly
+      // If in Mock Mode (no API key configured for any model), generate conversational answer using real API data directly
       if (isPlaceholder) {
-        const mockWeatherResp = weatherService.getMockWeatherConversationalResponse(
-          message,
-          resolvedWeatherData,
-          temporal,
-          resolvedHistoricalData,
-          forecastData
+        // Check if any other configured live model exists before falling back to rule-based mock
+        const availableModels = ["groq", "gemini", "openai", "claude"].filter(
+          m => m !== activeModel && !isPlaceholderKey(resolveApiKey(m, settings))
         );
-        return res.json({ 
-          response: mockWeatherResp,
-          city: activeCityResolved,
-          session_id: session_id || ""
-        });
+
+        if (availableModels.length === 0) {
+          const mockWeatherResp = weatherService.getMockWeatherConversationalResponse(
+            message,
+            resolvedWeatherData,
+            temporal,
+            resolvedHistoricalData,
+            forecastData
+          );
+          return res.json({ 
+            response: mockWeatherResp,
+            city: activeCityResolved,
+            session_id: session_id || ""
+          });
+        }
       }
 
     } catch (wErr) {
-      console.error("Weather processing error:", wErr);
+      console.error("Weather processing error:", sanitizeError(wErr.message));
       return res.json({ 
         response: "Live weather data is temporarily unavailable. Please try again in a few moments.",
         city: activeCityResolved,
@@ -521,301 +908,39 @@ async function handleChatRequest(req, res) {
     }
   }
 
-  if (isPlaceholder) {
-    setTimeout(() => {
-      res.json({
-        response: getMockResponse(message, activeModel),
-        city: activeCityResolved,
-        session_id: session_id || ""
-      });
-    }, 800);
-    return;
+  const aiPayload = {
+    weatherContextPrompt,
+    message,
+    history,
+    attachment
+  };
+
+  // Determine priority order of models to attempt (requested model first, then any other configured live models)
+  const modelsToAttempt = [];
+  if (!isPlaceholder) {
+    modelsToAttempt.push({ model: activeModel, key: apiKey });
   }
 
-  try {
-    if (activeModel === "groq") {
-      const Groq = require("groq-sdk");
-      const groq = new Groq({ apiKey });
-
-      const messages = [
-        {
-          role: "system",
-          content: weatherContextPrompt 
-            ? `You are WeatherGPT, a helpful weather and AI assistant. Answer accurately and conversationally using ONLY the verified meteorological data provided below. NEVER invent, hallucinate, or estimate numbers.\n\n${weatherContextPrompt}`
-            : "You are WeatherGPT, a helpful AI assistant. Answer clearly, concisely, and accurately."
-        }
-      ];
-
-      if (history && Array.isArray(history)) {
-        history.forEach(item => {
-          messages.push({
-            role: item.role === "assistant" ? "assistant" : "user",
-            content: item.content
-          });
-        });
-      }
-
-      let userPrompt = message;
-      if (weatherContextPrompt) {
-        userPrompt = `${weatherContextPrompt}\n\nUser Question: ${message}`;
-      }
-
-      messages.push({
-        role: "user",
-        content: userPrompt
-      });
-
-      const candidateModels = ["openai/gpt-oss-20b", "openai/gpt-oss-120b", "qwen/qwen3.8-27b", "groq/compound", "groq/compound-mini"];
-      let completion = null;
-      let lastError = null;
-
-      for (const modelId of candidateModels) {
-        try {
-          completion = await groq.chat.completions.create({
-            model: modelId,
-            messages,
-            temperature: 0.5,
-            max_tokens: 1024
-          });
-          if (completion?.choices?.[0]?.message?.content) break;
-        } catch (err) {
-          lastError = err;
-          console.warn(`Groq model ${modelId} failed, trying next fallback:`, err.message);
-        }
-      }
-
-      if (!completion && lastError) {
-        throw lastError;
-      }
-
-      const responseText =
-        completion?.choices?.[0]?.message?.content ||
-        "Sorry, I couldn't generate a response.";
-
-      res.json({ 
-        response: responseText,
-        city: activeCityResolved,
-        session_id: session_id || ""
-      });
-
-    } else if (activeModel === "gemini") {
-      const { GoogleGenerativeAI } = require("@google/generative-ai");
-      const genAI = new GoogleGenerativeAI(apiKey);
-
-      const formattedHistory = [];
-      if (history && Array.isArray(history)) {
-        history.forEach(item => {
-          formattedHistory.push({
-            role: item.role === "assistant" ? "model" : "user",
-            parts: [{ text: item.content }]
-          });
-        });
-      }
-
-      const now = new Date();
-      const currentDateTime = now.toLocaleString("en-IN", {
-        timeZone: "Asia/Kolkata",
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit"
-      });
-
-      const systemPrompt = weatherContextPrompt
-        ? `You are WeatherGPT, a helpful AI assistant. Answer the user's weather question naturally and conversationally using ONLY the verified meteorological data provided below. Do not invent or guess any weather values.\n\n${weatherContextPrompt}`
-        : `You are WeatherGPT, a helpful AI assistant. Current date and time in India is: ${currentDateTime}.\nIf user asks current date/time, answer using this information.`;
-
-      let finalPrompt = message;
-      if (weatherContextPrompt) {
-        finalPrompt = `${weatherContextPrompt}\n\nUser Question:\n${message}`;
-      }
-
-      const candidateGeminiModels = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-2.5-flash", "gemini-pro"];
-      let responseText = null;
-      let lastGeminiError = null;
-
-      for (const modelId of candidateGeminiModels) {
-        try {
-          const geminiModel = genAI.getGenerativeModel({ model: modelId });
-          const chat = geminiModel.startChat({
-            history: [
-              {
-                role: "user",
-                parts: [{ text: systemPrompt }]
-              },
-              {
-                role: "model",
-                parts: [{ text: "Understood. I will answer accurately based strictly on the verified data." }]
-              },
-              ...formattedHistory
-            ],
-          });
-
-          let result;
-          if (attachment && attachment.data && attachment.mimeType) {
-            result = await chat.sendMessage([
-              {
-                inlineData: {
-                  data: attachment.data,
-                  mimeType: attachment.mimeType
-                }
-              },
-              finalPrompt
-            ]);
-          } else {
-            result = await chat.sendMessage(finalPrompt);
-          }
-          responseText = result.response.text();
-          if (responseText) break;
-        } catch (err) {
-          lastGeminiError = err;
-          console.warn(`Gemini model ${modelId} failed:`, err.message);
-        }
-      }
-
-      if (!responseText && lastGeminiError) {
-        throw lastGeminiError;
-      }
-
-      res.json({ 
-        response: responseText || "Sorry, I couldn't generate a response.",
-        city: activeCityResolved,
-        session_id: session_id || ""
-      });
-
-    } else if (activeModel === "openai") {
-      const messages = [
-        { 
-          role: "system", 
-          content: weatherContextPrompt 
-            ? `You are WeatherGPT, an AI assistant. Answer using ONLY the real meteorological data provided in the prompt.\n\n${weatherContextPrompt}`
-            : "You are WeatherGPT, a helpful AI assistant." 
-        }
-      ];
-
-      if (history && Array.isArray(history)) {
-        history.forEach(item => {
-          messages.push({
-            role: item.role === "assistant" ? "assistant" : "user",
-            content: item.content
-          });
-        });
-      }
-
-      const userContent = [
-        { type: "text", text: weatherContextPrompt ? `${weatherContextPrompt}\n\nUser Question:\n${message}` : message }
-      ];
-
-      if (attachment && attachment.data && attachment.mimeType && attachment.mimeType.startsWith("image/")) {
-        userContent.push({
-          type: "image_url",
-          image_url: {
-            url: `data:${attachment.mimeType};base64,${attachment.data}`
-          }
-        });
-      }
-
-      messages.push({ role: "user", content: userContent });
-
-      const openAiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          messages: messages
-        })
-      });
-
-      if (!openAiResponse.ok) {
-        const errorText = await openAiResponse.text();
-        throw new Error(`OpenAI API returned status ${openAiResponse.status}: ${errorText}`);
-      }
-
-      const data = await openAiResponse.json();
-      const responseText = data.choices?.[0]?.message?.content || "";
-      res.json({ 
-        response: responseText,
-        city: activeCityResolved,
-        session_id: session_id || ""
-      });
-
-    } else if (activeModel === "claude") {
-      const messages = [];
-      if (history && Array.isArray(history)) {
-        history.forEach(item => {
-          messages.push({
-            role: item.role === "assistant" ? "assistant" : "user",
-            content: item.content
-          });
-        });
-      }
-
-      const userContent = [];
-      if (attachment && attachment.data && attachment.mimeType && attachment.mimeType.startsWith("image/")) {
-        userContent.push({
-          type: "image",
-          source: {
-            type: "base64",
-            media_type: attachment.mimeType,
-            data: attachment.data
-          }
-        });
-      }
-
-      const userTextPrompt = weatherContextPrompt
-        ? `${weatherContextPrompt}\n\nUser Question:\n${message}`
-        : message;
-
-      userContent.push({ type: "text", text: userTextPrompt });
-      messages.push({ role: "user", content: userContent });
-
-      const claudeResponse = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01"
-        },
-        body: JSON.stringify({
-          model: "claude-3-5-sonnet-20241022",
-          max_tokens: 1024,
-          messages: messages
-        })
-      });
-
-      if (!claudeResponse.ok) {
-        const errorText = await claudeResponse.text();
-        throw new Error(`Claude API returned status ${claudeResponse.status}: ${errorText}`);
-      }
-
-      const data = await claudeResponse.json();
-      const responseText = data.content?.[0]?.text || "";
-      res.json({ 
-        response: responseText,
-        city: activeCityResolved,
-        session_id: session_id || ""
-      });
-
-    } else {
-      throw new Error(`Unsupported model: ${activeModel}`);
+  const otherModels = ["groq", "gemini", "openai", "claude"].filter(m => m !== activeModel);
+  for (const altModel of otherModels) {
+    const altKey = resolveApiKey(altModel, settings);
+    if (!isPlaceholderKey(altKey)) {
+      modelsToAttempt.push({ model: altModel, key: altKey });
     }
-  } catch (error) {
-    console.error(`${activeModel} API error:`, error);
+  }
+
+  // If no live models are configured at all, return safe mock response
+  if (modelsToAttempt.length === 0) {
     if (resolvedWeatherData || resolvedHistoricalData) {
-      const fallbackResp = weatherService.getMockWeatherConversationalResponse(
+      const mockWeatherResp = weatherService.getMockWeatherConversationalResponse(
         message,
         resolvedWeatherData,
         resolvedTemporal,
         resolvedHistoricalData,
         forecastData
       );
-      return res.json({ 
-        response: fallbackResp,
+      return res.json({
+        response: mockWeatherResp,
         city: activeCityResolved,
         session_id: session_id || ""
       });
@@ -826,6 +951,53 @@ async function handleChatRequest(req, res) {
       session_id: session_id || ""
     });
   }
+
+  // Attempt generation with cascade fallback across configured models
+  let finalResponse = null;
+  let lastAttemptError = null;
+
+  for (const candidate of modelsToAttempt) {
+    try {
+      finalResponse = await executeAiGeneration(candidate.model, candidate.key, aiPayload);
+      if (finalResponse) {
+        break;
+      }
+    } catch (err) {
+      lastAttemptError = err;
+      console.warn(`Provider ${candidate.model} failed, attempting next fallback:`, sanitizeError(err.message));
+    }
+  }
+
+  if (finalResponse) {
+    return res.json({
+      response: finalResponse,
+      city: activeCityResolved,
+      session_id: session_id || ""
+    });
+  }
+
+  // Graceful fallback if all configured live providers fail
+  console.error("All AI provider attempts failed:", sanitizeError(lastAttemptError?.message || "Unknown error"));
+  if (resolvedWeatherData || resolvedHistoricalData) {
+    const fallbackResp = weatherService.getMockWeatherConversationalResponse(
+      message,
+      resolvedWeatherData,
+      resolvedTemporal,
+      resolvedHistoricalData,
+      forecastData
+    );
+    return res.json({
+      response: fallbackResp,
+      city: activeCityResolved,
+      session_id: session_id || ""
+    });
+  }
+
+  return res.json({
+    response: getMockResponse(message, activeModel),
+    city: activeCityResolved,
+    session_id: session_id || ""
+  });
 }
 
 app.post(["/api/v1/chat", "/api/chat"], handleChatRequest);
