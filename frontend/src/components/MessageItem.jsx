@@ -171,27 +171,27 @@ export default function MessageItem({ message }) {
   const markdownComponents = {
     table({ node, children, ...props }) {
       return (
-        <div className="weather-table-container">
-          <table className="weather-styled-table" {...props}>
+        <div className="chat-table-container">
+          <table className="chat-styled-table" {...props}>
             {children}
           </table>
         </div>
       );
     },
     thead({ node, children, ...props }) {
-      return <thead className="weather-table-head" {...props}>{children}</thead>;
+      return <thead className="chat-table-head" {...props}>{children}</thead>;
     },
     tbody({ node, children, ...props }) {
-      return <tbody className="weather-table-body" {...props}>{children}</tbody>;
+      return <tbody className="chat-table-body" {...props}>{children}</tbody>;
     },
     tr({ node, children, ...props }) {
-      return <tr className="weather-table-row" {...props}>{children}</tr>;
+      return <tr className="chat-table-row" {...props}>{children}</tr>;
     },
     th({ node, children, ...props }) {
-      return <th className="weather-table-th" {...props}>{children}</th>;
+      return <th className="chat-table-th" {...props}>{children}</th>;
     },
     td({ node, children, ...props }) {
-      return <td className="weather-table-td" {...props}>{children}</td>;
+      return <td className="chat-table-td" {...props}>{children}</td>;
     },
     code({ node, inline, className, children, ...props }) {
       const match = /language-(\w+)/.exec(className || "");
@@ -414,8 +414,8 @@ export default function MessageItem({ message }) {
           background: rgba(255, 255, 255, 0.1);
         }
         
-        /* Weather Table Styling */
-        .weather-table-container {
+        /* Chat Table Styling */
+        .chat-table-container {
           width: 100%;
           max-width: 100%;
           overflow-x: auto;
@@ -432,21 +432,21 @@ export default function MessageItem({ message }) {
           box-sizing: border-box;
         }
 
-        .weather-table-container::-webkit-scrollbar {
+        .chat-table-container::-webkit-scrollbar {
           height: 6px;
         }
 
-        .weather-table-container::-webkit-scrollbar-track {
+        .chat-table-container::-webkit-scrollbar-track {
           background: rgba(0, 0, 0, 0.1);
           border-radius: 4px;
         }
 
-        .weather-table-container::-webkit-scrollbar-thumb {
+        .chat-table-container::-webkit-scrollbar-thumb {
           background: rgba(255, 255, 255, 0.2);
           border-radius: 4px;
         }
 
-        .weather-styled-table {
+        .chat-styled-table {
           width: 100%;
           min-width: 480px;
           border-collapse: collapse;
@@ -456,12 +456,12 @@ export default function MessageItem({ message }) {
           line-height: 1.4;
         }
 
-        .weather-table-head {
+        .chat-table-head {
           background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%);
           border-bottom: 1px solid rgba(255, 255, 255, 0.12);
         }
 
-        .weather-table-th {
+        .chat-table-th {
           padding: 12px 16px;
           color: var(--text-main);
           font-weight: 600;
@@ -472,24 +472,24 @@ export default function MessageItem({ message }) {
           border: none;
         }
 
-        .weather-table-row {
+        .chat-table-row {
           border-bottom: 1px solid rgba(255, 255, 255, 0.05);
           transition: background-color 0.15s ease;
         }
 
-        .weather-table-row:last-child {
+        .chat-table-row:last-child {
           border-bottom: none;
         }
 
-        .weather-table-row:nth-child(even) {
+        .chat-table-row:nth-child(even) {
           background: rgba(255, 255, 255, 0.015);
         }
 
-        .weather-table-row:hover {
+        .chat-table-row:hover {
           background: rgba(255, 255, 255, 0.05);
         }
 
-        .weather-table-td {
+        .chat-table-td {
           padding: 11px 16px;
           color: var(--text-main);
           border: none;
@@ -497,34 +497,34 @@ export default function MessageItem({ message }) {
           vertical-align: middle;
         }
 
-        body.light-mode .weather-table-container {
+        body.light-mode .chat-table-container {
           background: rgba(255, 255, 255, 0.9);
           border-color: rgba(0, 0, 0, 0.1);
           box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
         }
 
-        body.light-mode .weather-table-head {
+        body.light-mode .chat-table-head {
           background: linear-gradient(180deg, rgba(0, 0, 0, 0.05) 0%, rgba(0, 0, 0, 0.02) 100%);
           border-bottom: 1px solid rgba(0, 0, 0, 0.1);
         }
 
-        body.light-mode .weather-table-th {
+        body.light-mode .chat-table-th {
           color: #0f172a;
         }
 
-        body.light-mode .weather-table-row {
+        body.light-mode .chat-table-row {
           border-bottom: 1px solid rgba(0, 0, 0, 0.05);
         }
 
-        body.light-mode .weather-table-row:nth-child(even) {
+        body.light-mode .chat-table-row:nth-child(even) {
           background: rgba(0, 0, 0, 0.015);
         }
 
-        body.light-mode .weather-table-row:hover {
+        body.light-mode .chat-table-row:hover {
           background: rgba(0, 0, 0, 0.04);
         }
 
-        body.light-mode .weather-table-td {
+        body.light-mode .chat-table-td {
           color: #1e293b;
         }
 
@@ -552,10 +552,10 @@ export default function MessageItem({ message }) {
             padding: 0.75rem 0.9rem;
             border-radius: 14px;
           }
-          .weather-styled-table {
+          .chat-styled-table {
             font-size: 0.8rem;
           }
-          .weather-table-th, .weather-table-td {
+          .chat-table-th, .chat-table-td {
             padding: 8px 10px;
           }
         }

@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import MessageItem from "./MessageItem";
 import TypingIndicator from "./TypingIndicator";
+import { getLiveWeather, searchLocations } from "../services/weatherTool";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -141,9 +142,15 @@ export default function ChatArea({
         if (res.ok) {
           const data = await res.json();
           setSearchResults(data);
+        } else {
+          // Fallback to direct client-side Open-Meteo geocoding search
+          const clientResults = await searchLocations(citySearchInput.trim(), 8);
+          setSearchResults(clientResults);
         }
       } catch (err) {
-        console.warn("Autocomplete error:", err);
+        console.warn("Backend search failed, using client-side geocoding search:", err);
+        const clientResults = await searchLocations(citySearchInput.trim(), 8);
+        setSearchResults(clientResults);
       } finally {
         setIsSearching(false);
       }
@@ -164,9 +171,29 @@ export default function ChatArea({
           if (!isCancelled) {
             setCityWeatherSummary(data);
           }
+        } else {
+          throw new Error("Backend current weather not ok");
         }
       } catch (err) {
-        console.warn("Could not fetch city weather snapshot:", err);
+        console.warn("Fetching weather snapshot via client-side Open-Meteo tool:", err);
+        try {
+          const liveData = await getLiveWeather(activeCity);
+          if (!isCancelled && liveData && !liveData.error) {
+            setCityWeatherSummary({
+              location: [liveData.city, liveData.admin1, liveData.country].filter(Boolean).join(", "),
+              temperature: liveData.tempNum ?? parseFloat(liveData.temperature),
+              feelsLike: liveData.tempNum ?? parseFloat(liveData.temperature),
+              condition: `${liveData.conditionIcon} ${liveData.conditionText}`,
+              uvIndex: "Moderate",
+              humidity: liveData.humidityNum ?? parseFloat(liveData.humidity),
+              pressure: liveData.rawCurrent?.surface_pressure || 1012,
+              windSpeed: liveData.windSpeedNum ?? parseFloat(liveData.wind_speed),
+              rainProbability: liveData.rawCurrent?.precipitation ? 100 : 0
+            });
+          }
+        } catch (clientErr) {
+          console.error("Client weather snapshot error:", clientErr);
+        }
       }
     };
 
@@ -646,6 +673,7 @@ export default function ChatArea({
               title="Select AI Model"
               disabled={isLoading}
             >
+              <option value="weathergpt">⚡ WeatherGPT Engine (Live Tool)</option>
               <option value="groq">Groq (LLaMA / GPT-OSS)</option>
               <option value="gemini">Gemini 2.5 Flash</option>
               <option value="openai">OpenAI GPT-4o-mini</option>

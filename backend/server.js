@@ -2,7 +2,6 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const fs = require("fs");
-const weatherService = require("./weatherService");
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 
 const app = express();
@@ -11,7 +10,7 @@ const PORT = process.env.PORT || 5000;
 app.get("/", (req, res) => {
   res.json({
     status: "Running",
-    message: "WeatherGPT AI Chatbot Backend API",
+    message: "KarthikAI Chatbot Backend API",
     version: "2.1.0"
   });
 });
@@ -157,7 +156,7 @@ app.get(["/api/health", "/api/v1/health"], (req, res) => {
 // Settings API endpoints
 app.get(["/api/settings", "/api/v1/settings"], (req, res) => {
   const settings = readSettings();
-  
+
   const geminiKey = resolveApiKey("gemini", settings);
   const groqKey = resolveApiKey("groq", settings);
   const openaiKey = resolveApiKey("openai", settings);
@@ -210,215 +209,49 @@ app.post(["/api/settings", "/api/v1/settings"], (req, res) => {
   res.json({ success: true, settings: newSettings });
 });
 
-// Mock responses for general non-weather testing when API key is missing
+// Mock responses for testing when API key is missing
 const mockResponses = [
-  "Hello! I am WeatherGPT Assistant. How can I help you today? You can ask me about current weather, forecasts, historical data, or general questions!",
-  "That is an interesting question. In a production environment, I connect to real-time APIs to give you accurate insights.",
+  "Hello! I am KarthikAI Assistant. How can I help you today?",
+  "That is an interesting question. In a production environment, I connect to real-time AI APIs to give you accurate insights.",
   "Here is some formatted code for you:\n\n```javascript\nfunction greet(name) {\n  console.log(`Hello, ${name}!`);\n}\n\ngreet('Developer');\n```",
-  "I am fully responsive with real-time meteorological weather data support."
+  "I am ready to help you with coding, writing, and general questions."
 ];
 
 let mockCounter = 0;
 
 function getMockResponse(userMessage, model) {
-  const modelName = model === "openai" ? "OpenAI GPT-4o-mini" : 
-                    model === "claude" ? "Claude 3.5 Sonnet" : 
-                    model === "groq" ? "Groq LLaMA" :
-                    "Gemini 2.5 Flash";
-  
+  const modelName = model === "openai" ? "OpenAI GPT-4o-mini" :
+    model === "claude" ? "Claude 3.5 Sonnet" :
+      model === "groq" ? "Groq LLaMA" :
+        "Gemini 2.5 Flash";
+
   const prefix = `[${modelName}] (Mock Mode)\n\n`;
   const msg = userMessage.toLowerCase().trim();
-  
+
   if (msg.includes("hello") || msg.includes("hi") || msg.includes("hey")) {
-    return prefix + `Hello there! I'm your WeatherGPT assistant. Ask me about weather anywhere in the world or let me assist you with coding and answers!`;
+    return prefix + "Hello there! I'm your KarthikAI assistant. Ask me anything or let me assist you with coding and answers!";
   }
   if (msg.includes("who are you") || msg.includes("your name")) {
-    return prefix + `I am WeatherGPT, an AI assistant with live meteorological intelligence and natural language capabilities.`;
+    return prefix + "I am KarthikAI, an AI assistant built to help you with questions, coding, and everyday tasks.";
   }
-  
+
   const resp = mockResponses[mockCounter % mockResponses.length];
   mockCounter++;
   return prefix + resp;
 }
 
 // -------------------------------------------------------------
-// WEATHER REST API ENDPOINTS
-// -------------------------------------------------------------
-
-// 1. Current Weather Endpoint: GET /api/v1/weather/current & GET /api/weather/current
-app.get(["/api/v1/weather/current", "/api/weather/current"], async (req, res) => {
-  const city = req.query.city || req.query.location;
-  if (!city) {
-    return res.status(400).json({ error: "city parameter is required" });
-  }
-
-  try {
-    const geo = await weatherService.geocodeLocation(city);
-    if (!geo) {
-      return res.status(404).json({ error: `Location "${city}" could not be geocoded` });
-    }
-
-    const data = await weatherService.fetchCurrentWeatherData(geo);
-    res.json(data);
-  } catch (err) {
-    console.error("Current weather API error:", err);
-    res.status(500).json({ error: "Failed to fetch current weather data", details: err.message });
-  }
-});
-
-// 2. Forecast Weather Endpoint: GET /api/v1/weather/forecast & GET /api/weather/forecast
-app.get(["/api/v1/weather/forecast", "/api/weather/forecast"], async (req, res) => {
-  const city = req.query.city || req.query.location;
-  const days = parseInt(req.query.days || "7", 10);
-  if (!city) {
-    return res.status(400).json({ error: "city parameter is required" });
-  }
-
-  try {
-    const geo = await weatherService.geocodeLocation(city);
-    if (!geo) {
-      return res.status(404).json({ error: `Location "${city}" could not be geocoded` });
-    }
-
-    const data = await weatherService.fetchForecastWeatherData(geo, days);
-    res.json(data);
-  } catch (err) {
-    console.error("Forecast weather API error:", err);
-    res.status(500).json({ error: "Failed to fetch weather forecast", details: err.message });
-  }
-});
-
-// 3. Hourly Weather Endpoint: GET /api/v1/weather/hourly & GET /api/weather/hourly
-app.get(["/api/v1/weather/hourly", "/api/weather/hourly"], async (req, res) => {
-  const city = req.query.city || req.query.location;
-  const hours = parseInt(req.query.hours || "24", 10);
-  if (!city) {
-    return res.status(400).json({ error: "city parameter is required" });
-  }
-
-  try {
-    const geo = await weatherService.geocodeLocation(city);
-    if (!geo) {
-      return res.status(404).json({ error: `Location "${city}" could not be geocoded` });
-    }
-
-    const data = await weatherService.fetchHourlyWeatherData(geo, hours);
-    res.json(data);
-  } catch (err) {
-    console.error("Hourly weather API error:", err);
-    res.status(500).json({ error: "Failed to fetch hourly weather data", details: err.message });
-  }
-});
-
-// 4. Historical Weather Endpoint: GET /api/v1/weather/history & GET /api/weather/history
-app.get(["/api/v1/weather/history", "/api/weather/history"], async (req, res) => {
-  const city = req.query.city || req.query.location;
-  const startDate = req.query.start_date;
-  const endDate = req.query.end_date;
-
-  if (!city) {
-    return res.status(400).json({ error: "city parameter is required" });
-  }
-  if (!startDate || !endDate) {
-    return res.status(400).json({ error: "start_date and end_date parameters are required (format: YYYY-MM-DD)" });
-  }
-
-  try {
-    const geo = await weatherService.geocodeLocation(city);
-    if (!geo) {
-      return res.status(404).json({ error: `Location "${city}" could not be geocoded` });
-    }
-
-    const data = await weatherService.fetchHistoricalWeatherData(geo, startDate, endDate);
-    res.json(data);
-  } catch (err) {
-    console.error("Historical weather API error:", err);
-    res.status(500).json({ error: "Failed to fetch historical weather data", details: err.message });
-  }
-});
-
-// 5. Location Search & Autocomplete Endpoint: GET /api/v1/weather/search & GET /api/weather/search
-app.get(["/api/v1/weather/search", "/api/weather/search"], async (req, res) => {
-  const query = req.query.q || req.query.query || req.query.name;
-  const limit = parseInt(req.query.limit || "10", 10);
-  if (!query) {
-    return res.status(400).json({ error: "q parameter is required" });
-  }
-
-  try {
-    const results = await weatherService.searchLocations(query, limit);
-    res.json(results);
-  } catch (err) {
-    console.error("Location search endpoint error:", err);
-    res.status(500).json({ error: "Failed to search locations", details: err.message });
-  }
-});
-
-// 6. Reverse Geocode Endpoint: GET /api/v1/weather/reverse-geocode & GET /api/weather/reverse-geocode
-app.get(["/api/v1/weather/reverse-geocode", "/api/weather/reverse-geocode", "/api/v1/weather/reverse", "/api/weather/reverse"], async (req, res) => {
-  const lat = req.query.lat || req.query.latitude;
-  const lon = req.query.lon || req.query.longitude || req.query.lng;
-  if (!lat || !lon) {
-    return res.status(400).json({ error: "lat and lon parameters are required" });
-  }
-
-  try {
-    const geo = await weatherService.reverseGeocode(lat, lon);
-    if (!geo) {
-      return res.status(404).json({ error: "Location could not be reverse-geocoded" });
-    }
-    res.json(geo);
-  } catch (err) {
-    console.error("Reverse geocode endpoint error:", err);
-    res.status(500).json({ error: "Failed to reverse geocode", details: err.message });
-  }
-});
-
-// General Weather API endpoint (backwards compatible)
-app.get(["/api/v1/weather", "/api/weather"], async (req, res) => {
-  const { city, location, start_date, end_date, days, hours } = req.query;
-  const targetCity = city || location;
-  if (!targetCity) {
-    return res.status(400).json({ error: "city parameter is required" });
-  }
-  try {
-    const geo = await weatherService.geocodeLocation(targetCity);
-    if (!geo) {
-      return res.status(404).json({ error: `Location "${targetCity}" could not be geocoded` });
-    }
-    if (start_date && end_date) {
-      const data = await weatherService.fetchHistoricalWeatherData(geo, start_date, end_date);
-      return res.json(data);
-    } else if (hours) {
-      const data = await weatherService.fetchHourlyWeatherData(geo, parseInt(hours, 10));
-      return res.json(data);
-    } else if (days) {
-      const data = await weatherService.fetchForecastWeatherData(geo, parseInt(days, 10));
-      return res.json(data);
-    } else {
-      const data = await weatherService.fetchCurrentWeatherData(geo);
-      return res.json(data);
-    }
-  } catch (err) {
-    console.error("Weather API error:", err);
-    res.status(500).json({ error: "Failed to fetch weather data", details: err.message });
-  }
-});
-
-// -------------------------------------------------------------
 // AI PROVIDER GENERATION FUNCTIONS
 // -------------------------------------------------------------
 
-async function generateGroqResponse(apiKey, { weatherContextPrompt, message, history }) {
+async function generateGroqResponse(apiKey, { message, history }) {
   const Groq = require("groq-sdk");
   const groq = new Groq({ apiKey });
 
   const messages = [
     {
       role: "system",
-      content: weatherContextPrompt
-        ? `You are WeatherGPT, a helpful weather and AI assistant. Answer accurately and conversationally using ONLY the verified meteorological data provided below. NEVER invent, hallucinate, or estimate numbers.\n\n${weatherContextPrompt}`
-        : "You are WeatherGPT, a helpful AI assistant. Answer clearly, concisely, and accurately."
+      content: "You are KarthikAI, a helpful AI assistant. Answer clearly, concisely, and accurately."
     }
   ];
 
@@ -433,14 +266,9 @@ async function generateGroqResponse(apiKey, { weatherContextPrompt, message, his
     });
   }
 
-  let userPrompt = message;
-  if (weatherContextPrompt) {
-    userPrompt = `${weatherContextPrompt}\n\nUser Question: ${message}`;
-  }
-
   messages.push({
     role: "user",
-    content: userPrompt
+    content: message
   });
 
   const candidateModels = ["openai/gpt-oss-20b", "openai/gpt-oss-120b", "qwen/qwen3.8-27b", "groq/compound", "groq/compound-mini"];
@@ -469,7 +297,7 @@ async function generateGroqResponse(apiKey, { weatherContextPrompt, message, his
   return completion?.choices?.[0]?.message?.content || "";
 }
 
-async function generateGeminiResponse(apiKey, { weatherContextPrompt, message, history, attachment }) {
+async function generateGeminiResponse(apiKey, { message, history, attachment }) {
   const { GoogleGenerativeAI } = require("@google/generative-ai");
   const genAI = new GoogleGenerativeAI(apiKey);
 
@@ -496,14 +324,7 @@ async function generateGeminiResponse(apiKey, { weatherContextPrompt, message, h
     minute: "2-digit"
   });
 
-  const systemPrompt = weatherContextPrompt
-    ? `You are WeatherGPT, a helpful AI assistant. Answer the user's weather question naturally and conversationally using ONLY the verified meteorological data provided below. Do not invent or guess any weather values.\n\n${weatherContextPrompt}`
-    : `You are WeatherGPT, a helpful AI assistant. Current date and time in India is: ${currentDateTime}.\nIf user asks current date/time, answer using this information.`;
-
-  let finalPrompt = message;
-  if (weatherContextPrompt) {
-    finalPrompt = `${weatherContextPrompt}\n\nUser Question:\n${message}`;
-  }
+  const systemPrompt = `You are KarthikAI, a helpful AI assistant. Current date and time in India is: ${currentDateTime}.\nIf user asks current date/time, answer using this information.`;
 
   const candidateGeminiModels = [
     "gemini-2.5-flash",
@@ -528,7 +349,7 @@ async function generateGeminiResponse(apiKey, { weatherContextPrompt, message, h
           },
           {
             role: "model",
-            parts: [{ text: "Understood. I will answer accurately based strictly on the verified data." }]
+            parts: [{ text: "Understood. I will answer clearly and accurately." }]
           },
           ...formattedHistory
         ],
@@ -543,10 +364,10 @@ async function generateGeminiResponse(apiKey, { weatherContextPrompt, message, h
               mimeType: attachment.mimeType
             }
           },
-          finalPrompt
+          message
         ]);
       } else {
-        result = await chat.sendMessage(finalPrompt);
+        result = await chat.sendMessage(message);
       }
       responseText = result.response.text();
       if (responseText) break;
@@ -563,10 +384,8 @@ async function generateGeminiResponse(apiKey, { weatherContextPrompt, message, h
   return responseText || "";
 }
 
-async function generateOpenAiResponse(apiKey, { weatherContextPrompt, message, history, attachment }) {
-  const systemPrompt = weatherContextPrompt
-    ? `You are WeatherGPT, an AI assistant. Answer using ONLY the real meteorological data provided in the prompt.\n\n${weatherContextPrompt}`
-    : "You are WeatherGPT, a helpful AI assistant. Answer clearly, concisely, and accurately.";
+async function generateOpenAiResponse(apiKey, { message, history, attachment }) {
+  const systemPrompt = "You are KarthikAI, a helpful AI assistant. Answer clearly, concisely, and accurately.";
 
   const messages = [
     { role: "system", content: systemPrompt }
@@ -583,13 +402,11 @@ async function generateOpenAiResponse(apiKey, { weatherContextPrompt, message, h
     });
   }
 
-  const userText = weatherContextPrompt ? `${weatherContextPrompt}\n\nUser Question:\n${message}` : message;
-
   if (attachment && attachment.data && attachment.mimeType && attachment.mimeType.startsWith("image/")) {
     messages.push({
       role: "user",
       content: [
-        { type: "text", text: userText },
+        { type: "text", text: message },
         {
           type: "image_url",
           image_url: {
@@ -599,7 +416,7 @@ async function generateOpenAiResponse(apiKey, { weatherContextPrompt, message, h
       ]
     });
   } else {
-    messages.push({ role: "user", content: userText });
+    messages.push({ role: "user", content: message });
   }
 
   const candidateModels = ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"];
@@ -643,10 +460,8 @@ async function generateOpenAiResponse(apiKey, { weatherContextPrompt, message, h
   return responseText || "";
 }
 
-async function generateClaudeResponse(apiKey, { weatherContextPrompt, message, history, attachment }) {
-  const systemPrompt = weatherContextPrompt
-    ? `You are WeatherGPT, a helpful AI assistant. Answer the user's weather question naturally and conversationally using ONLY the verified meteorological data provided below. Do not invent or guess any weather values.\n\n${weatherContextPrompt}`
-    : "You are WeatherGPT, a helpful AI assistant. Answer clearly, concisely, and accurately.";
+async function generateClaudeResponse(apiKey, { message, history, attachment }) {
+  const systemPrompt = "You are KarthikAI, a helpful AI assistant. Answer clearly, concisely, and accurately.";
 
   const rawMessages = [];
   if (history && Array.isArray(history)) {
@@ -672,11 +487,7 @@ async function generateClaudeResponse(apiKey, { weatherContextPrompt, message, h
     });
   }
 
-  const userTextPrompt = weatherContextPrompt
-    ? `${weatherContextPrompt}\n\nUser Question:\n${message}`
-    : message;
-
-  userContent.push({ type: "text", text: userTextPrompt });
+  userContent.push({ type: "text", text: message });
   rawMessages.push({ role: "user", content: userContent });
 
   // Format messages to strictly alternate roles and ensure first message is user (Anthropic API requirement)
@@ -772,7 +583,7 @@ async function executeAiGeneration(modelName, apiKey, payload) {
 // CHAT API HANDLER (Supports /api/v1/chat and /api/chat)
 // -------------------------------------------------------------
 async function handleChatRequest(req, res) {
-  const { message, city, history, session_id, model, attachment, clientLocation, userLocation } = req.body;
+  const { message, history, session_id, model, attachment } = req.body;
 
   if (!message) {
     return res.status(400).json({ error: "Message is required" });
@@ -785,139 +596,7 @@ async function handleChatRequest(req, res) {
   const apiKey = resolveApiKey(activeModel, settings);
   const isPlaceholder = isPlaceholderKey(apiKey);
 
-  // Weather Intelligence Processing
-  let weatherContextPrompt = "";
-  let resolvedWeatherData = null;
-  let resolvedHistoricalData = null;
-  let resolvedTemporal = null;
-  let forecastData = null;
-  let hourlyData = null;
-  let activeCityResolved = city || "Chennai";
-
-  if (weatherService.isWeatherQuery(message)) {
-    try {
-      const temporal = weatherService.extractTemporalIntent(message);
-      const locInfo = weatherService.extractLocation(message, history, city, clientLocation || userLocation);
-
-      if (!locInfo || !locInfo.locationName) {
-        return res.json({ 
-          response: "Which city or location would you like the weather for?",
-          city: activeCityResolved,
-          session_id: session_id || ""
-        });
-      }
-
-      const targetCity = locInfo.locationName;
-      const geo = await weatherService.geocodeLocation(targetCity);
-      if (!geo) {
-        return res.json({ 
-          response: `I'm unable to find weather data for "${targetCity}". Please verify the location name.`,
-          city: activeCityResolved,
-          session_id: session_id || ""
-        });
-      }
-
-      activeCityResolved = geo.name;
-      resolvedTemporal = temporal;
-
-      let currentData = null;
-      let historicalData = null;
-
-      // 1. COMPARISON INTENT
-      if (temporal.type === "comparison") {
-        currentData = await weatherService.fetchCurrentWeatherData(geo);
-        historicalData = await weatherService.fetchHistoricalWeatherData(
-          geo,
-          temporal.historicalStartDate,
-          temporal.historicalEndDate
-        );
-        resolvedWeatherData = currentData;
-        resolvedHistoricalData = historicalData;
-
-        weatherContextPrompt = weatherService.buildWeatherContextPrompt(
-          currentData,
-          null,
-          null,
-          historicalData,
-          temporal
-        );
-      }
-      // 2. HISTORICAL INTENT
-      else if (temporal.type === "historical") {
-        historicalData = await weatherService.fetchHistoricalWeatherData(geo, temporal.startDate, temporal.endDate);
-        resolvedWeatherData = historicalData;
-        resolvedHistoricalData = historicalData;
-
-        weatherContextPrompt = weatherService.buildWeatherContextPrompt(
-          null,
-          null,
-          null,
-          historicalData,
-          temporal
-        );
-      }
-      // 3. CURRENT / FORECAST / HOURLY INTENT
-      else {
-        currentData = await weatherService.fetchCurrentWeatherData(geo);
-        resolvedWeatherData = currentData;
-
-        if (
-          temporal.type === "forecast" ||
-          temporal.type === "weekend" ||
-          temporal.type === "tomorrow" ||
-          /\b(tomorrow|weekend|week|travel|trip|days|forecast)\b/i.test(message)
-        ) {
-          forecastData = await weatherService.fetchForecastWeatherData(geo, temporal.days || 7);
-        }
-
-        if (temporal.type === "hourly" || /\b(hourly|hour|rain\s+time|when\s+will\s+it\s+rain)\b/i.test(message)) {
-          hourlyData = await weatherService.fetchHourlyWeatherData(geo, temporal.hours || 24);
-        }
-
-        weatherContextPrompt = weatherService.buildWeatherContextPrompt(
-          currentData,
-          forecastData,
-          hourlyData,
-          null,
-          temporal
-        );
-      }
-
-      // If in Mock Mode (no API key configured for any model), generate conversational answer using real API data directly
-      if (isPlaceholder) {
-        // Check if any other configured live model exists before falling back to rule-based mock
-        const availableModels = ["groq", "gemini", "openai", "claude"].filter(
-          m => m !== activeModel && !isPlaceholderKey(resolveApiKey(m, settings))
-        );
-
-        if (availableModels.length === 0) {
-          const mockWeatherResp = weatherService.getMockWeatherConversationalResponse(
-            message,
-            resolvedWeatherData,
-            temporal,
-            resolvedHistoricalData,
-            forecastData
-          );
-          return res.json({ 
-            response: mockWeatherResp,
-            city: activeCityResolved,
-            session_id: session_id || ""
-          });
-        }
-      }
-
-    } catch (wErr) {
-      console.error("Weather processing error:", sanitizeError(wErr.message));
-      return res.json({ 
-        response: "Live weather data is temporarily unavailable. Please try again in a few moments.",
-        city: activeCityResolved,
-        session_id: session_id || ""
-      });
-    }
-  }
-
   const aiPayload = {
-    weatherContextPrompt,
     message,
     history,
     attachment
@@ -939,23 +618,8 @@ async function handleChatRequest(req, res) {
 
   // If no live models are configured at all, return safe mock response
   if (modelsToAttempt.length === 0) {
-    if (resolvedWeatherData || resolvedHistoricalData) {
-      const mockWeatherResp = weatherService.getMockWeatherConversationalResponse(
-        message,
-        resolvedWeatherData,
-        resolvedTemporal,
-        resolvedHistoricalData,
-        forecastData
-      );
-      return res.json({
-        response: mockWeatherResp,
-        city: activeCityResolved,
-        session_id: session_id || ""
-      });
-    }
     return res.json({
       response: getMockResponse(message, activeModel),
-      city: activeCityResolved,
       session_id: session_id || ""
     });
   }
@@ -979,31 +643,15 @@ async function handleChatRequest(req, res) {
   if (finalResponse) {
     return res.json({
       response: finalResponse,
-      city: activeCityResolved,
       session_id: session_id || ""
     });
   }
 
   // Graceful fallback if all configured live providers fail
   console.error("All AI provider attempts failed:", sanitizeError(lastAttemptError?.message || "Unknown error"));
-  if (resolvedWeatherData || resolvedHistoricalData) {
-    const fallbackResp = weatherService.getMockWeatherConversationalResponse(
-      message,
-      resolvedWeatherData,
-      resolvedTemporal,
-      resolvedHistoricalData,
-      forecastData
-    );
-    return res.json({
-      response: fallbackResp,
-      city: activeCityResolved,
-      session_id: session_id || ""
-    });
-  }
 
   return res.json({
     response: getMockResponse(message, activeModel),
-    city: activeCityResolved,
     session_id: session_id || ""
   });
 }
@@ -1129,9 +777,9 @@ app.post(["/api/transcribe", "/api/v1/transcribe"], async (req, res) => {
     res.json({ text: transcription });
   } catch (error) {
     console.error("Transcription API error:", error);
-    res.status(500).json({ 
-      error: "Failed to transcribe audio", 
-      details: error.message 
+    res.status(500).json({
+      error: "Failed to transcribe audio",
+      details: error.message
     });
   }
 });
@@ -1140,12 +788,7 @@ let server;
 
 function startServer(port = PORT) {
   server = app.listen(port, () => {
-    console.log(`WeatherGPT Backend server running on http://localhost:${port}`);
-    console.log(`Weather APIs:`);
-    console.log(`- GET /api/v1/weather/current?city={city}`);
-    console.log(`- GET /api/v1/weather/forecast?city={city}&days={days}`);
-    console.log(`- GET /api/v1/weather/hourly?city={city}&hours={hours}`);
-    console.log(`- GET /api/v1/weather/history?city={city}&start_date={YYYY-MM-DD}&end_date={YYYY-MM-DD}`);
+    console.log(`KarthikAI Backend server running on http://localhost:${port}`);
     console.log(`- POST /api/v1/chat`);
   });
   return server;

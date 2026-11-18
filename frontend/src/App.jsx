@@ -7,6 +7,7 @@ import { PanelLeft } from "lucide-react";
 import Login from "./components/Login";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "./firebase";
+import { getLiveWeather, generateWeatherGPTReport, extractCityFromPrompt } from "./services/weatherTool";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const BACKEND_URL = `${API_BASE}/api/v1/chat`;
@@ -264,6 +265,43 @@ export default function App() {
         content: m.content
       }));
 
+      const detectedCity = extractCityFromPrompt(text);
+      const cityToUse = detectedCity || ((activeCity && activeCity !== "Current Location") ? activeCity : "Pattukkottai");
+
+      // 1. Direct WeatherGPT Client Engine execution if selected
+      if (selectedModel === "weathergpt") {
+        const liveWeather = await getLiveWeather(cityToUse);
+        const reportContent = generateWeatherGPTReport(liveWeather, text);
+
+        if (liveWeather.city && liveWeather.city !== activeCity && !liveWeather.error) {
+          setActiveCity(liveWeather.city);
+        }
+
+        speakText(reportContent);
+
+        const aiMessage = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: reportContent,
+          timestamp: new Date().toISOString()
+        };
+
+        setConversations(prev => {
+          const target = prev.find(c => c.id === targetConvId);
+          if (!target) return prev;
+          const updated = {
+            ...target,
+            messages: [...target.messages, aiMessage]
+          };
+          saveConversationToBackend(updated);
+          return prev.map(c => c.id === targetConvId ? updated : c);
+        });
+
+        setIsLoading(false);
+        return;
+      }
+
+      // 2. Standard backend AI Model execution (Groq, Gemini, OpenAI, Claude)
       let promptMessage = text;
       let payloadAttachment = null;
 
@@ -286,8 +324,6 @@ export default function App() {
         }
       }
 
-      const cityPayload = (activeCity && activeCity !== "Current Location") ? activeCity : "Chennai";
-
       const response = await fetch(BACKEND_URL, {
         method: "POST",
         headers: {
@@ -295,7 +331,7 @@ export default function App() {
         },
         body: JSON.stringify({
           message: promptMessage,
-          city: cityPayload,
+          city: cityToUse,
           history: apiHistory,
           session_id: targetConvId,
           model: selectedModel,
@@ -345,30 +381,58 @@ export default function App() {
       });
 
     } catch (error) {
-      console.error("API error:", error);
+      console.warn("Backend error, engaging live WeatherGPT tool fallback:", error);
       
-      const isNetworkError = error.name === "TypeError" || (error.message && (error.message.includes("Failed to fetch") || error.message.includes("NetworkError") || error.message.includes("network")));
-      const errorContent = isNetworkError
-        ? `⚠️ **Connection Error**\n\nFailed to connect to the backend server at \`${BACKEND_URL}\`.\n\nPlease verify that the backend server is running (\`npm run dev\` or \`npm start\` in \`backend\`).`
-        : `⚠️ **Server Error**\n\n${error.message || "An unexpected error occurred while generating the response."}`;
+      // Automatic fallback to live WeatherGPT tool so users always get live weather data!
+      try {
+        const detectedCity = extractCityFromPrompt(text);
+        const targetCity = detectedCity || activeCity || "Pattukkottai";
+        const liveWeather = await getLiveWeather(targetCity);
+        const report = generateWeatherGPTReport(liveWeather, text);
 
-      const errorMessage = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: errorContent,
-        timestamp: new Date().toISOString()
-      };
+        if (liveWeather.city && liveWeather.city !== activeCity && !liveWeather.error) {
+          setActiveCity(liveWeather.city);
+        }
 
-      setConversations(prev => {
-        const target = prev.find(c => c.id === targetConvId);
-        if (!target) return prev;
-        const updated = {
-          ...target,
-          messages: [...target.messages, errorMessage]
+        speakText(report);
+
+        const aiMessage = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: report,
+          timestamp: new Date().toISOString()
         };
-        saveConversationToBackend(updated);
-        return prev.map(c => c.id === targetConvId ? updated : c);
-      });
+
+        setConversations(prev => {
+          const target = prev.find(c => c.id === targetConvId);
+          if (!target) return prev;
+          const updated = {
+            ...target,
+            messages: [...target.messages, aiMessage]
+          };
+          saveConversationToBackend(updated);
+          return prev.map(c => c.id === targetConvId ? updated : c);
+        });
+      } catch (fallbackErr) {
+        console.error("Fallback error:", fallbackErr);
+        const errorMessage = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: `⚠️ **Error Fetching Weather**\n\n${error.message || "Failed to retrieve weather metrics."}`,
+          timestamp: new Date().toISOString()
+        };
+
+        setConversations(prev => {
+          const target = prev.find(c => c.id === targetConvId);
+          if (!target) return prev;
+          const updated = {
+            ...target,
+            messages: [...target.messages, errorMessage]
+          };
+          saveConversationToBackend(updated);
+          return prev.map(c => c.id === targetConvId ? updated : c);
+        });
+      }
     } finally {
       setIsLoading(false);
     }
