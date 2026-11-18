@@ -1,4 +1,4 @@
-# Powershell script to open the Aether Chat Android project in Android Studio
+# Powershell script to open the KarthikAI Android project in Android Studio
 $studioPath = "C:\Program Files\Android\Android Studio1\bin\studio64.exe"
 $projectPath = Join-Path $PSScriptRoot "frontend\android"
 

@@ -294,7 +294,8 @@ body.light-mode .code-block-header {
   border-radius: 0;
 }
 
-.weather-table-container {
+.chat-table-container,
+.table-container {
   width: 100%;
   max-width: 100%;
   overflow-x: auto;

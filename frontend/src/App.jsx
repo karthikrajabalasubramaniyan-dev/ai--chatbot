@@ -7,7 +7,6 @@ import { PanelLeft } from "lucide-react";
 import Login from "./components/Login";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "./firebase";
-import { getLiveWeather, generateWeatherGPTReport, extractCityFromPrompt } from "./services/weatherTool";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const BACKEND_URL = `${API_BASE}/api/v1/chat`;
@@ -38,15 +37,6 @@ export default function App() {
   const [conversations, setConversations] = useState(() => {
     const saved = localStorage.getItem("ai_chatbot_conversations");
     return saved ? JSON.parse(saved) : [];
-  });
-
-  // Active City state for WeatherGPT
-  const [activeCity, setActiveCity] = useState(() => {
-    const saved = localStorage.getItem("weathergpt_active_city");
-    if (!saved || saved === "Current Location" || saved === "undefined" || saved === "null") {
-      return "Chennai";
-    }
-    return saved;
   });
 
   const [currentConversationId, setCurrentConversationId] = useState(() => {
@@ -133,13 +123,6 @@ export default function App() {
     }
   }, [currentConversationId]);
 
-  // Sync active city to localStorage
-  useEffect(() => {
-    if (activeCity && activeCity !== "Current Location") {
-      localStorage.setItem("weathergpt_active_city", activeCity);
-    }
-  }, [activeCity]);
-
   // Toggle Dark/Light mode body class
   useEffect(() => {
     if (theme === "light") {
@@ -189,15 +172,6 @@ export default function App() {
     speech.lang = "en-IN";
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(speech);
-  };
-
-  // Handle city change from UI
-  const handleCityChange = (newCity) => {
-    if (!newCity || typeof newCity !== "string") return;
-    const cleanCity = newCity.trim();
-    if (cleanCity && cleanCity !== "Current Location") {
-      setActiveCity(cleanCity);
-    }
   };
 
   // Handle sending a new message
@@ -265,43 +239,7 @@ export default function App() {
         content: m.content
       }));
 
-      const detectedCity = extractCityFromPrompt(text);
-      const cityToUse = detectedCity || ((activeCity && activeCity !== "Current Location") ? activeCity : "Pattukkottai");
-
-      // 1. Direct WeatherGPT Client Engine execution if selected
-      if (selectedModel === "weathergpt") {
-        const liveWeather = await getLiveWeather(cityToUse);
-        const reportContent = generateWeatherGPTReport(liveWeather, text);
-
-        if (liveWeather.city && liveWeather.city !== activeCity && !liveWeather.error) {
-          setActiveCity(liveWeather.city);
-        }
-
-        speakText(reportContent);
-
-        const aiMessage = {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: reportContent,
-          timestamp: new Date().toISOString()
-        };
-
-        setConversations(prev => {
-          const target = prev.find(c => c.id === targetConvId);
-          if (!target) return prev;
-          const updated = {
-            ...target,
-            messages: [...target.messages, aiMessage]
-          };
-          saveConversationToBackend(updated);
-          return prev.map(c => c.id === targetConvId ? updated : c);
-        });
-
-        setIsLoading(false);
-        return;
-      }
-
-      // 2. Standard backend AI Model execution (Groq, Gemini, OpenAI, Claude)
+      // Standard backend AI Model execution (Groq, Gemini, OpenAI, Claude)
       let promptMessage = text;
       let payloadAttachment = null;
 
@@ -331,7 +269,6 @@ export default function App() {
         },
         body: JSON.stringify({
           message: promptMessage,
-          city: cityToUse,
           history: apiHistory,
           session_id: targetConvId,
           model: selectedModel,
@@ -353,11 +290,6 @@ export default function App() {
 
       if (!data || !data.response) {
         throw new Error("Received empty response from backend server.");
-      }
-      
-      // If backend resolved a different active city (e.g. user asked "What about Mumbai?"), update active city
-      if (data.city && data.city !== "Current Location" && data.city !== activeCity) {
-        setActiveCity(data.city);
       }
 
       speakText(data.response);
@@ -381,58 +313,24 @@ export default function App() {
       });
 
     } catch (error) {
-      console.warn("Backend error, engaging live WeatherGPT tool fallback:", error);
-      
-      // Automatic fallback to live WeatherGPT tool so users always get live weather data!
-      try {
-        const detectedCity = extractCityFromPrompt(text);
-        const targetCity = detectedCity || activeCity || "Pattukkottai";
-        const liveWeather = await getLiveWeather(targetCity);
-        const report = generateWeatherGPTReport(liveWeather, text);
+      console.error("AI chat error:", error);
+      const errorMessage = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: `⚠️ **AI Service Error**\n\n${error.message || "Failed to generate AI response. Please verify your connection or model settings."}`,
+        timestamp: new Date().toISOString()
+      };
 
-        if (liveWeather.city && liveWeather.city !== activeCity && !liveWeather.error) {
-          setActiveCity(liveWeather.city);
-        }
-
-        speakText(report);
-
-        const aiMessage = {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: report,
-          timestamp: new Date().toISOString()
+      setConversations(prev => {
+        const target = prev.find(c => c.id === targetConvId);
+        if (!target) return prev;
+        const updated = {
+          ...target,
+          messages: [...target.messages, errorMessage]
         };
-
-        setConversations(prev => {
-          const target = prev.find(c => c.id === targetConvId);
-          if (!target) return prev;
-          const updated = {
-            ...target,
-            messages: [...target.messages, aiMessage]
-          };
-          saveConversationToBackend(updated);
-          return prev.map(c => c.id === targetConvId ? updated : c);
-        });
-      } catch (fallbackErr) {
-        console.error("Fallback error:", fallbackErr);
-        const errorMessage = {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: `⚠️ **Error Fetching Weather**\n\n${error.message || "Failed to retrieve weather metrics."}`,
-          timestamp: new Date().toISOString()
-        };
-
-        setConversations(prev => {
-          const target = prev.find(c => c.id === targetConvId);
-          if (!target) return prev;
-          const updated = {
-            ...target,
-            messages: [...target.messages, errorMessage]
-          };
-          saveConversationToBackend(updated);
-          return prev.map(c => c.id === targetConvId ? updated : c);
-        });
-      }
+        saveConversationToBackend(updated);
+        return prev.map(c => c.id === targetConvId ? updated : c);
+      });
     } finally {
       setIsLoading(false);
     }
@@ -487,7 +385,7 @@ export default function App() {
   if (authLoading) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", color: "var(--text-main)" }}>
-        Loading WeatherGPT...
+        Loading KarthikAI...
       </div>
     );
   }
@@ -544,8 +442,6 @@ export default function App() {
         activeModel={selectedModel}
         onChangeModel={setSelectedModel}
         onOpenSettings={() => setIsSettingsOpen(true)}
-        activeCity={activeCity}
-        onCityChange={handleCityChange}
       />
 
       {/* Glassmorphic Settings Modal */}

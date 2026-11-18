@@ -13,7 +13,7 @@ function createWindow() {
     height: 800,
     minWidth: 800,
     minHeight: 600,
-    title: "Aether Chat | AI Assistant",
+    title: "KarthikAI | AI Assistant",
     backgroundColor: "#080b11", // Match the app background color
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),

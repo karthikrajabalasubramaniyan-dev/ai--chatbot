@@ -4,7 +4,7 @@ require("dotenv").config({ path: path.join(__dirname, ".env") });
 
 async function runTests() {
   console.log("====================================================================");
-  console.log("WEATHERGPT BACKEND MODEL & API KEY CONFIGURATION TESTS");
+  console.log("KARTHIKAI BACKEND MODEL & API KEY CONFIGURATION TESTS");
   console.log("====================================================================");
 
   let passed = 0;
@@ -98,26 +98,25 @@ async function runTests() {
     }
   }
 
-  console.log("\n--- TEST 4: Weather Intelligence + Model Generation ---");
+  console.log("\n--- TEST 4: General AI Intelligence + Model Generation ---");
   for (const model of testModels) {
     try {
-      const weatherRes = await request({
+      const aiRes = await request({
         hostname: "localhost",
         port: 5000,
         path: "/api/v1/chat",
         method: "POST",
         headers: { "Content-Type": "application/json" }
       }, {
-        message: "What is the current temperature in Mumbai?",
-        city: "Mumbai",
+        message: "Explain what artificial intelligence is in one sentence.",
         model: model
       });
 
-      assert(weatherRes.statusCode === 200, `Weather query with model='${model}' returned 200 OK`);
-      assert(weatherRes.json && typeof weatherRes.json.response === "string" && weatherRes.json.response.length > 0,
-        `Weather response received for model='${model}'`);
+      assert(aiRes.statusCode === 200, `Query with model='${model}' returned 200 OK`);
+      assert(aiRes.json && typeof aiRes.json.response === "string" && aiRes.json.response.length > 0,
+        `AI response received for model='${model}'`);
     } catch (err) {
-      assert(false, `Weather chat test for model='${model}' failed: ${err.message}`);
+      assert(false, `Chat test for model='${model}' failed: ${err.message}`);
     }
   }
 

@@ -1,12 +1,12 @@
 {
-  "name": "aether-chat-desktop",
+  "name": "karthikai-desktop",
   "version": "1.0.0",
-  "description": "Desktop version of the Aether Chat AI Assistant",
+  "description": "Desktop version of the KarthikAI Assistant",
   "main": "main.js",
   "scripts": {
     "dev": "concurrently \"npm run dev --prefix frontend\" \"cross-env NODE_ENV=development electron .\"",
     "build:frontend": "npm run build --prefix frontend",
-    "dist": "npm run build:frontend && electron-packager . AetherChat --platform=win32 --arch=x64 --out=dist-electron --overwrite --ignore=\"(frontend/src|frontend/node_modules|frontend/public|dist-electron|\\.git)\""
+    "dist": "npm run build:frontend && electron-packager . KarthikAI --platform=win32 --arch=x64 --out=dist-electron --overwrite --ignore=\"(frontend/src|frontend/node_modules|frontend/public|dist-electron|\\.git)\""
   },
   "dependencies": {
     "@google/generative-ai": "^0.1.1",
@@ -21,8 +21,8 @@
     "electron-packager": "^17.1.2"
   },
   "build": {
-    "appId": "com.aether.chat",
-    "productName": "AetherChat",
+    "appId": "com.karthikai.chat",
+    "productName": "KarthikAI",
     "directories": {
       "output": "dist-electron"
     },
@@ -34,7 +34,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Aether Chat"
+      "shortcutName": "KarthikAI"
     },
     "files": [
       "main.js",
