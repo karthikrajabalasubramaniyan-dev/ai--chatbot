@@ -83,6 +83,17 @@ export default function ChatArea({
   // Study Modes: "2-marks" | "16-marks" | "unit-summary" | "tanglish-explain"
   const [studyMode, setStudyMode] = useState("16-marks");
 
+  // Selected Model for Chat Bar: "gemini" | "hf"
+  const [inputModel, setInputModel] = useState(() => {
+    return activeModel === "hf" ? "hf" : "gemini";
+  });
+
+  useEffect(() => {
+    if (activeModel === "hf" || activeModel === "gemini") {
+      setInputModel(activeModel);
+    }
+  }, [activeModel]);
+
   // PDF & Image Attachment States
   const [selectedFile, setSelectedFile] = useState(null);
   const [isParsing, setIsParsing] = useState(false);
@@ -333,10 +344,10 @@ export default function ChatArea({
       if (onStudyAgent) {
         onStudyAgent(input.trim(), studyMode, attachment);
       } else {
-        onSendMessage(input.trim(), attachment);
+        onSendMessage(input.trim(), attachment, inputModel);
       }
     } else {
-      onSendMessage(input.trim(), attachment);
+      onSendMessage(input.trim(), attachment, inputModel);
     }
 
     setInput("");
@@ -355,7 +366,7 @@ export default function ChatArea({
     if (appMode === "study" && onStudyAgent) {
       onStudyAgent(prompt, studyMode, null);
     } else {
-      onSendMessage(prompt);
+      onSendMessage(prompt, null, inputModel);
     }
   };
 
@@ -416,14 +427,21 @@ export default function ChatArea({
         <div className="header-right">
           <div className="model-selector-wrapper">
             <select
-              value={activeModel || "groq"}
-              onChange={(e) => onChangeModel?.(e.target.value)}
+              value={activeModel || inputModel || "gemini"}
+              onChange={(e) => {
+                const val = e.target.value;
+                onChangeModel?.(val);
+                if (val === "hf" || val === "gemini") {
+                  setInputModel(val);
+                }
+              }}
               className="model-dropdown-select glass-panel"
               title="Select AI Model"
               disabled={isLoading}
             >
+              <option value="gemini">Gemini (Default)</option>
+              <option value="hf">Hugging Face (Qwen 2.5)</option>
               <option value="groq">Groq (LLaMA / GPT-OSS)</option>
-              <option value="gemini">Gemini 2.5 Flash</option>
               <option value="openai">OpenAI GPT-4o-mini</option>
               <option value="claude">Claude 3.5 Sonnet</option>
             </select>
@@ -599,6 +617,29 @@ export default function ChatArea({
             </button>
           </div>
         )}
+
+        {/* Compact Model Selector Bar near chat input */}
+        <div className="input-toolbar-row animate-fade-in">
+          <div className="input-model-selector-wrapper">
+            <Bot size={13} className="input-model-icon" />
+            <span className="input-model-tag">Model:</span>
+            <select
+              value={inputModel}
+              onChange={(e) => {
+                const val = e.target.value;
+                setInputModel(val);
+                onChangeModel?.(val);
+              }}
+              className="input-model-dropdown"
+              title="Select Chat Model"
+              disabled={isLoading}
+              aria-label="Select Chat Model"
+            >
+              <option value="gemini">Gemini (Default)</option>
+              <option value="hf">Hugging Face (Qwen 2.5)</option>
+            </select>
+          </div>
+        </div>
 
         <div className={`input-box-wrapper glass-panel ${appMode === "study" ? "study-input-active" : ""}`}>
           <input
@@ -1163,6 +1204,61 @@ export default function ChatArea({
           display: flex;
           justify-content: center;
           margin-bottom: 2px;
+        }
+
+        .input-toolbar-row {
+          display: flex;
+          align-items: center;
+          justify-content: flex-start;
+          padding: 0 4px;
+        }
+
+        .input-model-selector-wrapper {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 10px;
+          border-radius: 20px;
+          background-color: var(--bg-surface);
+          border: 1px solid var(--border-color);
+          font-size: 0.78rem;
+          color: var(--text-muted);
+          transition: all 0.2s ease;
+        }
+
+        .input-model-selector-wrapper:hover {
+          border-color: var(--primary);
+          background-color: var(--bg-surface-hover);
+        }
+
+        .input-model-icon {
+          color: #8b5cf6;
+          flex-shrink: 0;
+        }
+
+        .input-model-tag {
+          font-weight: 600;
+          color: var(--text-muted);
+          font-size: 0.72rem;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+        }
+
+        .input-model-dropdown {
+          background: transparent;
+          border: none;
+          outline: none;
+          color: var(--text-main);
+          font-size: 0.8rem;
+          font-weight: 500;
+          cursor: pointer;
+          padding: 2px 4px;
+          border-radius: 6px;
+        }
+
+        .input-model-dropdown option {
+          background-color: #0f172a;
+          color: #f8fafc;
         }
 
         .stop-speaking-btn {

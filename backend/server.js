@@ -659,6 +659,107 @@ async function handleChatRequest(req, res) {
 app.post(["/api/v1/chat", "/api/chat"], handleChatRequest);
 
 // -------------------------------------------------------------
+// HUGGING FACE INFERENCE CHAT ENDPOINT (POST /api/hf-chat)
+// -------------------------------------------------------------
+async function handleHfChatRequest(req, res) {
+  const { message, history, session_id } = req.body;
+
+  if (!message) {
+    return res.status(400).json({ error: "Message is required" });
+  }
+
+  const hfToken = process.env.HF_TOKEN;
+
+  if (!hfToken || isPlaceholderKey(hfToken)) {
+    return res.json({
+      response: `[Hugging Face Qwen 2.5 Demo Response]:\n\nHello! I received your message: "${message}". To enable live Hugging Face inference, please set a valid HF_TOKEN in your backend .env file.`,
+      model: "Qwen/Qwen2.5-7B-Instruct",
+      session_id: session_id || "",
+      source: "mock"
+    });
+  }
+
+  try {
+    const { HfInference } = require("@huggingface/inference");
+    const hf = new HfInference(hfToken);
+
+    const messages = [
+      {
+        role: "system",
+        content: "You are KarthikAI powered by Qwen 2.5 on Hugging Face. Answer clearly, concisely, and accurately."
+      }
+    ];
+
+    if (history && Array.isArray(history)) {
+      history.forEach(item => {
+        if (item && item.content) {
+          messages.push({
+            role: item.role === "assistant" ? "assistant" : "user",
+            content: item.content
+          });
+        }
+      });
+    }
+
+    messages.push({
+      role: "user",
+      content: message
+    });
+
+    const completion = await hf.chatCompletion({
+      model: "Qwen/Qwen2.5-7B-Instruct",
+      messages,
+      max_tokens: 1024,
+      temperature: 0.7
+    });
+
+    const reply = completion?.choices?.[0]?.message?.content;
+    if (reply) {
+      return res.json({
+        response: reply,
+        model: "Qwen/Qwen2.5-7B-Instruct",
+        session_id: session_id || "",
+        source: "huggingface"
+      });
+    }
+
+    throw new Error("No response content returned from Hugging Face Inference API.");
+  } catch (error) {
+    console.error("Hugging Face API error:", sanitizeError(error.message));
+
+    // Fallback: If HF fails due to provider quota, credit, or model routing,
+    // utilize configured Gemini as fallback or return a helpful response
+    let fallbackText = null;
+    try {
+      const settings = readSettings();
+      const geminiKey = resolveApiKey("gemini", settings);
+      if (!isPlaceholderKey(geminiKey)) {
+        const geminiReply = await generateGeminiResponse(geminiKey, { message, history });
+        if (geminiReply) {
+          fallbackText = `${geminiReply}\n\n*(Note: Served via Gemini fallback. Hugging Face notice: ${sanitizeError(error.message).split("\n")[0]})*`;
+        }
+      }
+    } catch (fallbackErr) {
+      // ignore fallback error
+    }
+
+    if (!fallbackText) {
+      fallbackText = `**[KarthikAI • Qwen 2.5]**\n\nI processed your request: "${message}"\n\n*(Note: Hugging Face notice: ${sanitizeError(error.message)}. You can check your Hugging Face account tokens or switch back to Gemini (Default).)*`;
+    }
+
+    return res.json({
+      response: fallbackText,
+      model: "Qwen/Qwen2.5-7B-Instruct",
+      session_id: session_id || "",
+      source: "fallback",
+      error: sanitizeError(error.message)
+    });
+  }
+}
+
+app.post(["/api/hf-chat", "/api/v1/hf-chat"], handleHfChatRequest);
+
+// -------------------------------------------------------------
 // ANNA UNIVERSITY CSE STUDY & EXAM PREP AGENT
 // -------------------------------------------------------------
 
@@ -1250,6 +1351,7 @@ function startServer(port = PORT) {
   server = app.listen(port, () => {
     console.log(`KarthikAI Backend server running on http://localhost:${port}`);
     console.log(`- POST /api/v1/chat`);
+    console.log(`- POST /api/hf-chat`);
     console.log(`- POST /api/study-agent`);
   });
   return server;

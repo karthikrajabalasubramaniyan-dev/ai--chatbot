@@ -10,6 +10,7 @@ import { auth } from "./firebase";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const BACKEND_URL = `${API_BASE}/api/v1/chat`;
+const HF_CHAT_URL = `${API_BASE}/api/hf-chat`;
 const STUDY_AGENT_URL = `${API_BASE}/api/study-agent`;
 const HISTORY_URL = `${API_BASE}/api/v1/history`;
 const SETTINGS_URL = `${API_BASE}/api/v1/settings`;
@@ -52,11 +53,11 @@ export default function App() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // AI Model States (Default to Groq or Gemini)
-  const [selectedModel, setSelectedModel] = useState("groq");
+  // AI Model States (Default to Gemini)
+  const [selectedModel, setSelectedModel] = useState("gemini");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settings, setSettings] = useState({
-    defaultModel: "groq",
+    defaultModel: "gemini",
     apiKeys: { gemini: "", groq: "", openai: "", claude: "" }
   });
 
@@ -176,7 +177,7 @@ export default function App() {
   };
 
   // Handle sending a new message
-  const handleSendMessage = async (text, attachment) => {
+  const handleSendMessage = async (text, attachment, modelOverride) => {
     if (!text.trim()) return;
 
     const isImage = attachment && attachment.mimeType?.startsWith("image/");
@@ -240,7 +241,10 @@ export default function App() {
         content: m.content
       }));
 
-      // Standard backend AI Model execution (Groq, Gemini, OpenAI, Claude)
+      const effectiveModel = modelOverride || selectedModel || "gemini";
+      const isHuggingFace = effectiveModel === "hf" || effectiveModel === "huggingface";
+      const targetEndpoint = isHuggingFace ? HF_CHAT_URL : BACKEND_URL;
+
       let promptMessage = text;
       let payloadAttachment = null;
 
@@ -252,7 +256,7 @@ export default function App() {
             mimeType: attachment.mimeType
           };
         } else {
-          if (selectedModel === "gemini") {
+          if (effectiveModel === "gemini") {
             payloadAttachment = {
               data: attachment.data,
               mimeType: attachment.mimeType
@@ -263,18 +267,26 @@ export default function App() {
         }
       }
 
-      const response = await fetch(BACKEND_URL, {
+      const requestPayload = isHuggingFace
+        ? {
+            message: promptMessage,
+            history: apiHistory,
+            session_id: targetConvId
+          }
+        : {
+            message: promptMessage,
+            history: apiHistory,
+            session_id: targetConvId,
+            model: effectiveModel,
+            attachment: payloadAttachment
+          };
+
+      const response = await fetch(targetEndpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          message: promptMessage,
-          history: apiHistory,
-          session_id: targetConvId,
-          model: selectedModel,
-          attachment: payloadAttachment
-        })
+        body: JSON.stringify(requestPayload)
       });
 
       let data = null;

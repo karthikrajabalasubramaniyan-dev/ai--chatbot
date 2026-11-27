@@ -5,6 +5,7 @@
   "main": "main.js",
   "scripts": {
     "dev": "concurrently \"npm run dev --prefix frontend\" \"cross-env NODE_ENV=development electron .\"",
+    "build": "npm run build --prefix frontend",
     "build:frontend": "npm run build --prefix frontend",
     "dist": "npm run build:frontend && electron-packager . KarthikAI --platform=win32 --arch=x64 --out=dist-electron --overwrite --ignore=\"(frontend/src|frontend/node_modules|frontend/public|dist-electron|\\.git)\""
   },
