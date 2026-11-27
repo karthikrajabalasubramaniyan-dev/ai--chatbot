@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { User, Bot, Copy, Check, Volume2, VolumeX } from "lucide-react";
+import { User, Bot, Copy, Check, Volume2, VolumeX, Globe } from "lucide-react";
 
 // Preprocess markdown to ensure table blocks have proper newline boundaries, matching columns and blank lines
 function preprocessMarkdown(content) {
@@ -236,6 +236,13 @@ export default function MessageItem({ message }) {
           {/* Voice read-aloud and Copy response buttons for AI responses */}
           {!isUser && (
             <div className="bubble-actions" style={{ gap: '8px' }}>
+              {message.liveWeb && (
+                <span className="live-web-badge" title="Grounded with live web search (2001–2026)">
+                  <Globe size={11} />
+                  <span>Live Web (2001–2026)</span>
+                </span>
+              )}
+
               <button
                 className={`bubble-action-btn ${isSpeakingThis ? "speaking" : ""}`}
                 onClick={handleReadAloud}
@@ -367,6 +374,21 @@ export default function MessageItem({ message }) {
         }
         
         /* Copy action buttons overlay */
+        .live-web-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 3px 8px;
+          border-radius: 6px;
+          font-size: 0.72rem;
+          font-weight: 550;
+          color: #38bdf8;
+          background: rgba(56, 189, 248, 0.1);
+          border: 1px solid rgba(56, 189, 248, 0.25);
+          letter-spacing: 0.02em;
+          margin-right: auto;
+        }
+
         .bubble-actions {
           display: flex;
           justify-content: flex-end;

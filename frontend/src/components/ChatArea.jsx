@@ -94,6 +94,9 @@ export default function ChatArea({
     }
   }, [activeModel]);
 
+  // Live Web (2001–2026) Grounding & Live Search toggle
+  const [liveWebEnabled, setLiveWebEnabled] = useState(true);
+
   // PDF & Image Attachment States
   const [selectedFile, setSelectedFile] = useState(null);
   const [isParsing, setIsParsing] = useState(false);
@@ -344,10 +347,10 @@ export default function ChatArea({
       if (onStudyAgent) {
         onStudyAgent(input.trim(), studyMode, attachment);
       } else {
-        onSendMessage(input.trim(), attachment, inputModel);
+        onSendMessage(input.trim(), attachment, inputModel, liveWebEnabled);
       }
     } else {
-      onSendMessage(input.trim(), attachment, inputModel);
+      onSendMessage(input.trim(), attachment, inputModel, liveWebEnabled);
     }
 
     setInput("");
@@ -366,7 +369,7 @@ export default function ChatArea({
     if (appMode === "study" && onStudyAgent) {
       onStudyAgent(prompt, studyMode, null);
     } else {
-      onSendMessage(prompt, null, inputModel);
+      onSendMessage(prompt, null, inputModel, liveWebEnabled);
     }
   };
 
@@ -638,6 +641,17 @@ export default function ChatArea({
               <option value="groq">Groq (Llama 3.3 70B)</option>
             </select>
           </div>
+
+          <button
+            type="button"
+            className={`live-web-toggle-pill ${liveWebEnabled ? "active" : ""}`}
+            onClick={() => setLiveWebEnabled(prev => !prev)}
+            title={liveWebEnabled ? "Live Web & Grounding Active (2001–2026)" : "Live Web Search Disabled"}
+          >
+            <Globe size={12} className="live-web-icon" />
+            <span>Live Web (2001–2026)</span>
+            <span className={`live-web-dot ${liveWebEnabled ? "on" : "off"}`}></span>
+          </button>
         </div>
 
         <div className={`input-box-wrapper glass-panel ${appMode === "study" ? "study-input-active" : ""}`}>
@@ -1209,7 +1223,58 @@ export default function ChatArea({
           display: flex;
           align-items: center;
           justify-content: flex-start;
+          gap: 10px;
           padding: 0 4px;
+          flex-wrap: wrap;
+        }
+
+        .live-web-toggle-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 11px;
+          border-radius: 20px;
+          background-color: var(--bg-surface);
+          border: 1px solid var(--border-color);
+          font-size: 0.78rem;
+          font-weight: 550;
+          color: var(--text-muted);
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .live-web-toggle-pill:hover {
+          border-color: #38bdf8;
+          color: var(--text-main);
+          background-color: var(--bg-surface-hover);
+        }
+
+        .live-web-toggle-pill.active {
+          color: #38bdf8;
+          background: rgba(56, 189, 248, 0.1);
+          border-color: rgba(56, 189, 248, 0.4);
+          box-shadow: 0 0 10px rgba(56, 189, 248, 0.15);
+        }
+
+        .live-web-icon {
+          color: #38bdf8;
+        }
+
+        .live-web-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background-color: #64748b;
+          transition: background-color 0.2s ease;
+        }
+
+        .live-web-dot.on {
+          background-color: #10b981;
+          box-shadow: 0 0 6px #10b981;
+        }
+
+        .live-web-dot.off {
+          background-color: #ef4444;
         }
 
         .input-model-selector-wrapper {

@@ -178,7 +178,7 @@ export default function App() {
   };
 
   // Handle sending a new message
-  const handleSendMessage = async (text, attachment, modelOverride) => {
+  const handleSendMessage = async (text, attachment, modelOverride, liveWeb = true) => {
     if (!text.trim()) return;
 
     const isImage = attachment && attachment.mimeType?.startsWith("image/");
@@ -273,14 +273,16 @@ export default function App() {
             message: promptMessage,
             history: apiHistory,
             session_id: targetConvId,
-            model: "llama-3.3-70b-versatile"
+            model: "llama-3.3-70b-versatile",
+            liveWeb: liveWeb !== false
           }
         : {
             message: promptMessage,
             history: apiHistory,
             session_id: targetConvId,
             model: effectiveModel,
-            attachment: payloadAttachment
+            attachment: payloadAttachment,
+            liveWeb: liveWeb !== false
           };
 
       const response = await fetch(targetEndpoint, {
@@ -313,7 +315,10 @@ export default function App() {
         id: (Date.now() + 1).toString(),
         role: "assistant",
         content: data.response,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        liveWeb: data.liveWeb || false,
+        source: data.source || null,
+        model: data.model || effectiveModel
       };
 
       setConversations(prev => {
@@ -445,7 +450,8 @@ export default function App() {
         id: (Date.now() + 1).toString(),
         role: "assistant",
         content: generatedNotes,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        liveWeb: data.liveWeb || false
       };
 
       setConversations(prev => {

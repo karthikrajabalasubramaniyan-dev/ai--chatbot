@@ -241,17 +241,104 @@ function getMockResponse(userMessage, model) {
 }
 
 // -------------------------------------------------------------
+// SHARED HELPER: build the 25-year knowledge system prompt
+// -------------------------------------------------------------
+function buildKnowledgeSystemPrompt(role = "KarthikAI, a helpful AI assistant") {
+  const now = new Date();
+  const currentDateFull = now.toLocaleDateString("en-IN", { dateStyle: "full" });
+  const currentDateTime = now.toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    weekday: "long", year: "numeric", month: "long", day: "numeric",
+    hour: "2-digit", minute: "2-digit"
+  });
+
+  return `You are ${role}.
+Today's exact date and time (India): ${currentDateTime}.
+
+KNOWLEDGE SCOPE:
+You have comprehensive knowledge covering the past 25 years (2001–2026) up to today's date (${currentDateFull}).
+Combine your deep historical knowledge (2001–2024) with real-time web search context for 2024–2026 events.
+When answering questions about recent events, explicitly acknowledge the year 2026 as the current year.
+Never claim your knowledge only goes up to 2024—your effective knowledge extends to ${currentDateFull}.
+If asked about the current date, year, or time, state today's exact date: ${currentDateFull}.`;
+}
+
+// -------------------------------------------------------------
+// SHARED HELPER: Tavily / Wikipedia live web search context
+// Returns a brief web snippet string to prepend to user message, or "" if unavailable
+// -------------------------------------------------------------
+async function fetchLiveSearchContext(query) {
+  const tavilyKey = (process.env.TAVILY_API_KEY || "").trim();
+
+  // Try Tavily first (rich structured results)
+  if (tavilyKey && !isPlaceholderKey(tavilyKey)) {
+    try {
+      const res = await fetch("https://api.tavily.com/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          api_key: tavilyKey,
+          query: query,
+          max_results: 3,
+          search_depth: "basic"
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const results = data.results || [];
+        if (results.length > 0) {
+          const snippets = results.map((r, i) =>
+            `[${i + 1}] ${r.title}: ${(r.content || r.snippet || "").slice(0, 300)}`
+          ).join("\n");
+          return `\n\n---\n📡 **Live Web Context (Tavily, ${new Date().getFullYear()}):**\n${snippets}\n---`;
+        }
+      }
+    } catch (e) {
+      console.warn("Tavily search failed:", sanitizeError(e.message));
+    }
+  }
+
+  // Wikipedia instant search fallback (no API key required)
+  try {
+    const encoded = encodeURIComponent(query.slice(0, 120));
+    const res = await fetch(
+      `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encoded}&utf8=1&format=json&srlimit=2`
+    );
+    if (res.ok) {
+      const data = await res.json();
+      const results = (data.query?.search || []).slice(0, 2);
+      if (results.length > 0) {
+        const snippets = results.map((r, i) =>
+          `[${i + 1}] ${r.title}: ${(r.snippet || "").replace(/<[^>]+>/g, "").slice(0, 250)}`
+        ).join("\n");
+        return `\n\n---\n📖 **Knowledge Context (Wikipedia):**\n${snippets}\n---`;
+      }
+    }
+  } catch (e) {
+    console.warn("Wikipedia fallback failed:", sanitizeError(e.message));
+  }
+
+  return "";
+}
+
+// -------------------------------------------------------------
 // AI PROVIDER GENERATION FUNCTIONS
 // -------------------------------------------------------------
 
-async function generateGroqResponse(apiKey, { message, history }) {
+async function generateGroqResponse(apiKey, { message, history, liveSearch = true }) {
   const Groq = require("groq-sdk");
   const groq = new Groq({ apiKey });
+
+  // Fetch live search context if enabled
+  let searchContext = "";
+  if (liveSearch) {
+    try { searchContext = await fetchLiveSearchContext(message); } catch (_) { }
+  }
 
   const messages = [
     {
       role: "system",
-      content: "You are KarthikAI, a helpful AI assistant. Answer clearly, concisely, and accurately."
+      content: buildKnowledgeSystemPrompt("KarthikAI, a helpful AI assistant")
     }
   ];
 
@@ -268,7 +355,7 @@ async function generateGroqResponse(apiKey, { message, history }) {
 
   messages.push({
     role: "user",
-    content: message
+    content: searchContext ? `${message}${searchContext}` : message
   });
 
   const candidateModels = ["openai/gpt-oss-20b", "openai/gpt-oss-120b", "qwen/qwen3.8-27b", "groq/compound", "groq/compound-mini"];
@@ -297,7 +384,7 @@ async function generateGroqResponse(apiKey, { message, history }) {
   return completion?.choices?.[0]?.message?.content || "";
 }
 
-async function generateGeminiResponse(apiKey, { message, history, attachment }) {
+async function generateGeminiResponse(apiKey, { message, history, attachment, useGrounding = true }) {
   const { GoogleGenerativeAI } = require("@google/generative-ai");
   const genAI = new GoogleGenerativeAI(apiKey);
 
@@ -313,34 +400,34 @@ async function generateGeminiResponse(apiKey, { message, history, attachment }) 
     });
   }
 
-  const now = new Date();
-  const currentDateTime = now.toLocaleString("en-IN", {
-    timeZone: "Asia/Kolkata",
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
+  const systemPrompt = buildKnowledgeSystemPrompt("KarthikAI, a helpful AI assistant");
 
-  const systemPrompt = `You are KarthikAI, a helpful AI assistant. Current date and time in India is: ${currentDateTime}.\nIf user asks current date/time, answer using this information.`;
-
-  const candidateGeminiModels = [
+  // Models that support googleSearch grounding (Gemini 1.5+)
+  const groundingModels = [
     "gemini-2.5-flash",
     "gemini-1.5-flash",
     "gemini-1.5-flash-latest",
     "gemini-2.0-flash",
     "gemini-1.5-pro",
-    "gemini-1.5-pro-latest",
-    "gemini-pro"
+    "gemini-1.5-pro-latest"
   ];
+  // Final fallback model that may not support tools
+  const fallbackModels = ["gemini-pro"];
+  const candidateGeminiModels = [...groundingModels, ...fallbackModels];
+
   let responseText = null;
   let lastGeminiError = null;
 
   for (const modelId of candidateGeminiModels) {
     try {
-      const geminiModel = genAI.getGenerativeModel({ model: modelId });
+      // Enable Google Search grounding for supported models when no attachment
+      const isGroundingModel = groundingModels.includes(modelId);
+      const shouldGround = useGrounding && isGroundingModel && !attachment;
+      const modelConfig = shouldGround
+        ? { model: modelId, tools: [{ googleSearch: {} }] }
+        : { model: modelId };
+
+      const geminiModel = genAI.getGenerativeModel(modelConfig);
       const chat = geminiModel.startChat({
         history: [
           {
@@ -349,7 +436,7 @@ async function generateGeminiResponse(apiKey, { message, history, attachment }) 
           },
           {
             role: "model",
-            parts: [{ text: "Understood. I will answer clearly and accurately." }]
+            parts: [{ text: "Understood. I will answer clearly and accurately, using my comprehensive knowledge from 2001 to 2026 and live web search when available." }]
           },
           ...formattedHistory
         ],
@@ -583,7 +670,7 @@ async function executeAiGeneration(modelName, apiKey, payload) {
 // CHAT API HANDLER (Supports /api/v1/chat and /api/chat)
 // -------------------------------------------------------------
 async function handleChatRequest(req, res) {
-  const { message, history, session_id, model, attachment } = req.body;
+  const { message, history, session_id, model, attachment, liveWeb = true } = req.body;
 
   if (!message) {
     return res.status(400).json({ error: "Message is required" });
@@ -599,7 +686,9 @@ async function handleChatRequest(req, res) {
   const aiPayload = {
     message,
     history,
-    attachment
+    attachment,
+    useGrounding: liveWeb !== false,
+    liveSearch: liveWeb !== false
   };
 
   // Determine priority order of models to attempt (requested model first, then any other configured live models)
@@ -620,7 +709,8 @@ async function handleChatRequest(req, res) {
   if (modelsToAttempt.length === 0) {
     return res.json({
       response: getMockResponse(message, activeModel),
-      session_id: session_id || ""
+      session_id: session_id || "",
+      liveWeb: false
     });
   }
 
@@ -643,7 +733,8 @@ async function handleChatRequest(req, res) {
   if (finalResponse) {
     return res.json({
       response: finalResponse,
-      session_id: session_id || ""
+      session_id: session_id || "",
+      liveWeb: liveWeb !== false
     });
   }
 
@@ -663,7 +754,7 @@ app.post(["/api/v1/chat", "/api/chat"], handleChatRequest);
 // Ultra-fast OpenAI-compatible endpoint with multi-model cascade & Gemini fallback
 // -------------------------------------------------------------
 async function handleGroqChatRequest(req, res) {
-  const { message, history, session_id } = req.body;
+  const { message, history, session_id, liveWeb = true } = req.body;
 
   if (!message) {
     return res.status(400).json({ error: "Message is required" });
@@ -676,14 +767,23 @@ async function handleGroqChatRequest(req, res) {
       response: `[Groq Demo Response]:\n\nHello! I received your message: "${message}". To enable live Groq inference, please set a valid GROQ_API_KEY in your backend .env file.`,
       model: "llama-3.3-70b-versatile",
       session_id: session_id || "",
-      source: "mock"
+      source: "mock",
+      liveWeb: false
     });
+  }
+
+  // Live search context helper for Groq (Tavily with Wikipedia fallback)
+  let liveCtx = "";
+  if (liveWeb !== false) {
+    try {
+      liveCtx = await fetchLiveSearchContext(message);
+    } catch (_) { }
   }
 
   const messages = [
     {
       role: "system",
-      content: "You are KarthikAI, a helpful AI assistant powered by Groq. Answer clearly, concisely, and accurately."
+      content: buildKnowledgeSystemPrompt("KarthikAI, a helpful AI assistant powered by Groq")
     }
   ];
 
@@ -700,7 +800,7 @@ async function handleGroqChatRequest(req, res) {
 
   messages.push({
     role: "user",
-    content: message
+    content: liveCtx ? `${message}${liveCtx}` : message
   });
 
   // Primary: llama-3.3-70b-versatile, Secondary: llama-3.1-8b-instant, then available high-speed Groq models
@@ -757,7 +857,8 @@ async function handleGroqChatRequest(req, res) {
       response: reply,
       model: successfulModel || "llama-3.3-70b-versatile",
       session_id: session_id || "",
-      source: "groq"
+      source: "groq",
+      liveWeb: liveWeb !== false
     });
   }
 
@@ -769,7 +870,7 @@ async function handleGroqChatRequest(req, res) {
     const settings = readSettings();
     const geminiKey = resolveApiKey("gemini", settings);
     if (!isPlaceholderKey(geminiKey)) {
-      const geminiReply = await generateGeminiResponse(geminiKey, { message, history });
+      const geminiReply = await generateGeminiResponse(geminiKey, { message, history, useGrounding: liveWeb !== false });
       if (geminiReply) {
         fallbackText = geminiReply;
       }
@@ -787,6 +888,7 @@ async function handleGroqChatRequest(req, res) {
     model: "llama-3.3-70b-versatile",
     session_id: session_id || "",
     source: "fallback",
+    liveWeb: liveWeb !== false,
     error: sanitizeError(lastErrorDetail || "Groq error")
   });
 }
