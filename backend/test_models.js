@@ -28,7 +28,7 @@ async function runTests() {
         res.on("data", chunk => { data += chunk; });
         res.on("end", () => {
           let json = null;
-          try { json = JSON.parse(data); } catch(e) {}
+          try { json = JSON.parse(data); } catch (e) { }
           resolve({ status: res.status, statusCode: res.statusCode, headers: res.headers, data, json });
         });
       });
@@ -125,6 +125,29 @@ async function runTests() {
   const { sanitizeError } = require("./server"); // check if sanitize is functional or test regex
   const regexTest = rawKeyLeakTest.replace(/sk-[a-zA-Z0-9_\-\.]{15,}/gi, "sk-[REDACTED]");
   assert(regexTest === "sk-[REDACTED]", "Sanitizer properly redacts OpenAI/Anthropic/Google keys from error messages");
+
+  console.log("\n--- TEST 6: Study & Exam Prep Agent (POST /api/study-agent) ---");
+  const studyModes = ["2-marks", "16-marks", "unit-summary", "tanglish-explain"];
+  for (const sMode of studyModes) {
+    try {
+      const studyRes = await request({
+        hostname: "localhost",
+        port: 5000,
+        path: "/api/study-agent",
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      }, {
+        topic: "Operating Systems Deadlock Detection",
+        mode: sMode
+      });
+
+      assert(studyRes.statusCode === 200, `POST /api/study-agent mode='${sMode}' returned 200 OK`);
+      assert(studyRes.json && studyRes.json.success === true && typeof studyRes.json.response === "string" && studyRes.json.response.length > 50,
+        `Valid study material returned for mode='${sMode}' (${studyRes.json?.response?.length} chars)`);
+    } catch (err) {
+      assert(false, `Study Agent test for mode='${sMode}' failed: ${err.message}`);
+    }
+  }
 
   console.log("\n====================================================================");
   console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED`);

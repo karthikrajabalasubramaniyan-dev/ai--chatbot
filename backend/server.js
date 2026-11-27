@@ -658,6 +658,466 @@ async function handleChatRequest(req, res) {
 
 app.post(["/api/v1/chat", "/api/chat"], handleChatRequest);
 
+// -------------------------------------------------------------
+// ANNA UNIVERSITY CSE STUDY & EXAM PREP AGENT
+// -------------------------------------------------------------
+
+function buildStudyAgentPrompt(mode, topic, notesText = "") {
+  const combinedContext = notesText
+    ? `\n\n--- REFERENCE STUDY NOTES / SYLLABUS EXTRACT ---\n${notesText.slice(0, 20000)}\n------------------------------------------------`
+    : "";
+
+  let modeSpecificRules = "";
+
+  switch (mode) {
+    case "2-marks":
+      modeSpecificRules = `
+ROLE & TASK:
+You are an Anna University CSE Semester Exam Controller & Senior Professor.
+Generate EXACTLY 10 High-Yield Part-A (2-Marks) Questions & Model Answers for: "${topic}".
+
+STRICT FORMAT & CRITERIA:
+- Generate 10 numbered questions: Q1 to Q10 with bold questions.
+- Under each question, provide a crisp, exam-ready answer (2 to 4 bullet points, strictly 30-50 words).
+- Highlight essential definitions, technical keywords, formulas, or acronyms that Anna University evaluators look for to award full 2/2 marks.
+- Include at least two "Differentiate between X and Y" tabular/point-by-point comparisons.
+- Focus on frequently repeated questions from past Anna University exams (Regulation 2017/2021).`;
+      break;
+
+    case "16-marks":
+      modeSpecificRules = `
+ROLE & TASK:
+You are an Anna University CSE Semester Exam Evaluator.
+Generate Important Part-B / Part-C (16-Marks) Questions with Comprehensive, High-Scoring University Model Answers for: "${topic}".
+
+STRICT FORMAT & CRITERIA:
+Provide 2 to 3 most probable 16-mark university exam questions with full model answers.
+For each question, follow the structured Anna University 16-mark scoring format:
+1. **Question with Mark Split-up** (e.g. [8 + 8 = 16 Marks] or [16 Marks]).
+2. **Introduction & Formal Definition** (technical, formal terminology).
+3. **Neat Diagram / Architecture Placeholder**:
+   Provide a clean ASCII / Box diagram showing the architecture or flowchart, e.g.:
+   \`\`\`
+   +-------------------------------------------------------------+
+   | [DIAGRAM PLACEHOLDER: Architectural Block Diagram / Flow]   |
+   | Input -> Component A -> Execution Engine -> Output Buffer   |
+   +-------------------------------------------------------------+
+   \`\`\`
+   Followed by detailed step-by-step labeled explanation.
+4. **Working Principle & Step-by-Step Operation** (numbered points).
+5. **Mathematical Formulations / Algorithms / Pseudocode / Tables** (where applicable).
+6. **Key Technical Features & Trade-offs**.
+7. **Advantages, Disadvantages & Real-World CSE Applications**.
+8. **Anna University Key Evaluator Takeaways**: 3-4 bullet points emphasizing exact keywords needed for full marks.`;
+      break;
+
+    case "unit-summary":
+      modeSpecificRules = `
+ROLE & TASK:
+Create a High-Yield Quick Revision Cheat Sheet & Concept Map for Anna University CSE exams for: "${topic}".
+
+STRICT FORMAT & CRITERIA:
+1. **Core Concept Matrix**: A clear Markdown table summarizing all key sub-topics, their primary purpose, and key protocols/formulas.
+2. **Must-Know Technical Definitions**: High-density 1-line definitions for all critical terms and acronyms.
+3. **Key Comparison Tables**: Tabular comparison of the most commonly contrasted concepts (e.g., A vs B with 4+ comparison criteria).
+4. **Anna University Exam Radar**: Top 5 most frequently repeated questions in university exams (Nov/Dec & April/May).
+5. **Formulas & Complexity Summary**: Quick reference of all mathematical formulas, time/space complexities, and algorithm bounds.`;
+      break;
+
+    case "tanglish-explain":
+      modeSpecificRules = `
+ROLE & TASK:
+Explain this Anna University CSE topic in engaging, crystal-clear, beginner-friendly TANGLISH (Tamil + English combined) for: "${topic}".
+
+STRICT FORMAT & CRITERIA:
+- Tone: Friendly, knowledgeable engineering senior / mentor explaining to a junior before exam night.
+- Use natural spoken Tanglish phrasing (e.g., "Basically indha concept enna pannum-na...", "Namma daily life-la Swiggy / WhatsApp use panrom la, adhey concept dhaan...", "Anna University exam-la idhai ezhudhum podhu...").
+- Structure:
+  1. **What is it really? (Concept Oru Simple Summary)**
+  2. **Real-Life Example / Analogy (Namma Ooru Analogy 🛵)**
+  3. **How It Works Step-by-Step (Idhu epdi work aagudhu?)**
+  4. **Anna University Exam Tips (Exam-la full marks vaanga tips 📝)**: What diagrams to draw and headings to write.
+  5. **Crucial Technical Keywords (Indha English words kandippa paper-la irukanum)**`;
+      break;
+
+    default:
+      modeSpecificRules = `Generate structured Anna University CSE examination study notes for: "${topic}".`;
+  }
+
+  return `You are KarthikAI, an elite Anna University CSE Semester Exam Preparation Expert & Tutor.
+Help students score 'O' (Outstanding) or 'A+' grades in their university theory exams.
+
+${modeSpecificRules}
+
+TOPIC / SYLLABUS:
+${topic}
+${combinedContext}
+
+Ensure formatting is immaculate with Markdown headings, bold keywords, bullet points, and code/diagram blocks where helpful. Write directly to the student without generic meta-introductions.`;
+}
+
+function getMockStudyAgentResponse(mode, topic) {
+  const safeTopic = topic || "Computer Science Engineering Concept";
+  if (mode === "2-marks") {
+    return `### 🎓 Anna University CSE Exam Prep: Part-A (2-Mark Q&A)
+**Subject / Topic:** ${safeTopic}  
+**Regulation:** 2017 / 2021 | **Evaluation Focus:** High-Yield Crisp Answers
+
+---
+
+#### **Q1. Define ${safeTopic} and state its primary objective.**
+**Ans:** 
+- **Definition:** ${safeTopic} is a foundational CSE architectural mechanism designed to process, coordinate, and optimize computing resources.
+- **Primary Objective:** Maximizes computational throughput while minimizing resource latency and computational overhead.
+
+#### **Q2. List the key components involved in ${safeTopic}.**
+**Ans:**
+- **Control Interface:** Interprets instructions and coordinates execution logic.
+- **Data Engine:** Manages processing state, memory buffers, and registers.
+- **Communication Bus:** Provides high-speed inter-module data transfer.
+
+#### **Q3. Differentiate between Static and Dynamic approaches in ${safeTopic}.**
+**Ans:**
+| Criteria | Static Approach | Dynamic Approach |
+| :--- | :--- | :--- |
+| **Binding Time** | Compile / Design time | Runtime |
+| **Overhead** | Low runtime overhead | Higher runtime management |
+| **Flexibility** | Rigid, predefined | Adaptive to workload |
+
+#### **Q4. What is the fundamental formula or governing metric for ${safeTopic}?**
+**Ans:**
+The standard performance metric is given by:
+\`\`\`
+Efficiency (η) = (Useful Work Done / Total Execution Time) × 100%
+\`\`\`
+It measures system utilization under peak and average loads.
+
+#### **Q5. Mention any two critical constraints in implementing ${safeTopic}.**
+**Ans:**
+1. **Memory Scalability:** High memory consumption during recursive or multi-threaded state transitions.
+2. **Synchronization Overhead:** Race conditions and lock contention in concurrent environments.
+
+#### **Q6. Why is synchronization crucial in ${safeTopic}?**
+**Ans:**
+Without strict synchronization primitives (e.g., semaphores or mutexes), simultaneous state access leads to inconsistent shared memory states and race conditions.
+
+#### **Q7. State the worst-case time and space complexity associated with ${safeTopic}.**
+**Ans:**
+- **Time Complexity:** $O(n \\log n)$ for optimized sorting/indexing operations, degrading to $O(n^2)$ without proper indexing.
+- **Space Complexity:** $O(n)$ auxiliary buffer space.
+
+#### **Q8. What is the significance of caching in ${safeTopic}?**
+**Ans:**
+Caching exploits **temporal and spatial locality of reference**, reducing expensive main memory/disk access delays and speeding up response cycles by up to 80%.
+
+#### **Q9. State any two standard protocols or algorithms related to ${safeTopic}.**
+**Ans:**
+1. **Greedy / Heuristic Routing Protocol:** Ensures shortest latency path discovery.
+2. **Two-Phase Commit / Locking Algorithm:** Guarantees strict ACID consistency across distributed replicas.
+
+#### **Q10. Give two real-world industrial applications of ${safeTopic}.**
+**Ans:**
+1. High-throughput distributed transaction engines (e.g., banking gateways, payment switches).
+2. Cloud container orchestrators (e.g., Kubernetes scheduling, microservice routing).`;
+  } else if (mode === "16-marks") {
+    return `### 🎓 Anna University CSE Exam Prep: Part-B / Part-C (16-Mark Model Answer)
+**Subject / Topic:** ${safeTopic}  
+**Marks Allocation:** [16 Marks] | **Format:** University Model Answer
+
+---
+
+### **1. Introduction & Formal Definition**
+**${safeTopic}** is a core architectural framework in modern Computer Science Engineering that governs how complex computational entities interact, synchronize, and exchange data reliably. In the Anna University curriculum, questions on this topic test theoretical depth, architectural diagrams, step-by-step algorithms, and trade-off analysis.
+
+---
+
+### **2. System Architecture & Diagram Placeholder**
+Students must draw the following architectural diagram neatly using pencil and scale in the answer booklet:
+
+\`\`\`
++---------------------------------------------------------------------------------+
+|                       ${safeTopic.toUpperCase()} ARCHITECTURE                        |
++---------------------------------------------------------------------------------+
+|                                                                                 |
+|   +-------------------+         +-------------------+         +---------------+ |
+|   |   Client Input    | ------> | Processing Module | ------> | Storage Buffer| |
+|   | (Syllabus/Request)|         |  (Parsing & Exec) |         | (Memory/Cache)| |
+|   +-------------------+         +-------------------+         +---------------+ |
+|             |                             |                           |         |
+|             v                             v                           v         |
+|   +-------------------------------------------------------------------------+   |
+|   |                 CENTRAL CONTROL & SYNCHRONIZATION BUS                   |   |
+|   +-------------------------------------------------------------------------+   |
+|                                                                                 |
++---------------------------------------------------------------------------------+
+\`\`\`
+*(Exam Tip: Label each module with its input bandwidth, execution status, and acknowledge signals to score full diagram marks.)*
+
+---
+
+### **3. Working Principle & Step-by-Step Operation**
+The system executes via a 4-phase structured lifecycle:
+
+1. **Initialization & Handshake Phase:**
+   - Establishes communication channels, resets register pointers, and validates initial configuration parameters.
+2. **Processing & State Transition Phase:**
+   - Evaluates input criteria against predefined heuristic bounds.
+   - Enforces synchronization locks to preserve mutual exclusion.
+3. **Data Verification & Checkpoint Phase:**
+   - Verifies intermediate parity bits or cryptographic checksums.
+   - Records operational logs for fault tolerance and transaction rollback.
+4. **Output Dispatch & Resource Deallocation:**
+   - Dispatches finalized packets to downstream consumer modules.
+   - Clears temporary buffers and returns lock ownership.
+
+---
+
+### **4. Comparative Analysis Table**
+| Feature | Standard Implementation | Optimized Implementation |
+| :--- | :--- | :--- |
+| **Throughput** | Moderate ($O(n)$) | High ($O(\\log n)$ via indexing) |
+| **Fault Tolerance** | Single-point vulnerability | Multi-master consensus replication |
+| **Scalability** | Vertical (scale-up) | Horizontal (scale-out) |
+| **Latency** | 15–25 ms | < 5 ms in cached tier |
+
+---
+
+### **5. Advantages & Practical Applications**
+- **Advantages:**
+  * High deterministic predictability in mission-critical environments.
+  * Modular decoupling allowing isolated debugging and unit scaling.
+  * Robust fault recovery protocols preventing data loss during power/network failures.
+- **Real-World Applications:**
+  * Cloud hypervisors and distributed container orchestrators.
+  * High-concurrency relational and NoSQL database query engines.
+
+---
+
+### **6. Anna University Key Evaluator Takeaways**
+*Evaluators look for the following keywords when awarding 15-16 full marks:*
+1. **Architectural block diagram with labeled control lines**.
+2. **Time and space complexity derivation**.
+3. **Clear pointwise distinction between static and dynamic states**.
+4. **Neat summary of real-world use cases**.`;
+  } else if (mode === "unit-summary") {
+    return `### ⚡ Anna University CSE Quick Revision Cheat Sheet
+**Subject / Topic:** ${safeTopic}  
+**Purpose:** Rapid Pre-Exam Revision & Memory Map
+
+---
+
+### **1. Core Concept Matrix**
+| Concept | Primary Purpose | Key Protocol / Formula | Exam Importance |
+| :--- | :--- | :--- | :--- |
+| **Core Architecture** | System foundation & data flow | Central Bus / Pipeline | ⭐⭐⭐⭐⭐ (Part-B) |
+| **State Coordination** | Race-free mutual exclusion | Semaphores, Mutex, Locks | ⭐⭐⭐⭐⭐ (Part-A & B) |
+| **Optimization Tier** | Latency reduction | Caching / Locality ($O(1)$) | ⭐⭐⭐⭐ (Part-A) |
+| **Error Handling** | Fault isolation & recovery | Parity, CRC, 2-Phase Commit | ⭐⭐⭐⭐ (Part-B) |
+
+---
+
+### **2. Must-Know Technical Definitions**
+- **${safeTopic}**: The systematic coordination of hardware and software abstractions to achieve optimal computational resource utilization.
+- **Throughput**: Total number of successful state operations processed per unit time ($T = N / \\Delta t$).
+- **Deadlock**: A condition where a set of processes are permanently blocked because each process holds a resource and waits for another.
+- **Locality of Reference**: The tendency of processors to access the same set of memory locations repeatedly over a short time interval.
+
+---
+
+### **3. Top 5 Most Repeated Anna University Exam Questions**
+1. *Explain the architecture and detailed working principle of ${safeTopic} with neat diagram. [16 Marks]*
+2. *Differentiate between Static and Dynamic scheduling in ${safeTopic}. [2 Marks]*
+3. *Derive the time and space complexity under best, average, and worst cases. [8 Marks]*
+4. *How does error recovery and checkpointing occur during unexpected failures? [8 Marks]*
+5. *State the necessary and sufficient conditions for system safety. [2 Marks]*
+
+---
+
+### **4. Pre-Exam Quick Memory Checklist**
+- [ ] Memorize the labeled block diagram and data direction arrows.
+- [ ] Remember the comparison table (at least 4 solid technical points).
+- [ ] Practice drawing the ASCII / block flowchart in under 4 minutes.
+- [ ] Quote standard IEEE / ACM terms in your introductory paragraph.`;
+  } else {
+    // tanglish-explain
+    return `### 🗣️ Simple Tanglish Explanation: ${safeTopic}
+**Topic:** ${safeTopic}  
+**Style:** Easy-to-understand Anna University CSE Student Guide 🎓
+
+---
+
+### **1. What is it really? (Concept Oru Simple Summary)**
+Namma CSE-la **${safeTopic}** nu paatha, idhu romba periya complex vishayam illa boss! 
+Simple-ah sollanum-na: **"Oru system-la irukkura resource-ah epdi correct-ah, fast-ah, safe-ah handle pannanum"** nu solra oru standard mechanism dhaan idhu.
+
+Imagine pannunga:
+Oru college lab-la 50 students irukaanga, aana printer 1 dhaan irukku. Ellarum ore nerathula "Print" kudutha printer crash aayidum, correct-ah?
+Adha control panna oru **Queue manager** irukanum. Andha maadhiri work dhaan ${safeTopic} pannudhu!
+
+---
+
+### **2. Real-Life Example (Namma Ooru Analogy 🛵)**
+- **Real-Life Scenario:** Namma **Swiggy / Zomato** order panrom.
+  1. Neenga order place panreenga (Input request).
+  2. Kitchen-la chef cook panraaru (Processing unit).
+  3. Delivery partner pick pannitu unga veetuku vararu (Network transport).
+  4. Neenga OTP solli receive panreenga (Acknowledge / Handshake).
+- Idhey dhaan ${safeTopic}-layum nadakkudhu: Request varudhu -> Buffer-la store aagudhu -> Process aagi -> Verified output return aagudhu!
+
+---
+
+### **3. Step-by-Step How It Works (Step-by-step Execution)**
+1. **Request Intake:** First client kitta irundhu packet / task input varum.
+2. **Resource Check:** Buffer space irukka, memory free-ah irukka nu check pannum.
+3. **Execution:** Algorithm execute aagi data compute aagum.
+4. **Acknowledgement:** "Work done!" nu success signal send pannitu memory-ah free pannidum.
+
+---
+
+### **4. Anna University Exam Tips (Epdi ezhudhanum?) 📝**
+- **Diagram:** Paper thiruthura staff first paakradhu unga **Diagram** dhaan! Pencil-la neat-ah box potu input, process, output nu arrows kaatunga.
+- **Side Headings:** Paragraph-ah ezhudhadheenga. 
+  - *Introduction*
+  - *Architecture Diagram*
+  - *Working Principle*
+  - *Advantages*
+  nu neat headings podunga, full marks guaranteed!
+
+---
+
+### **5. Crucial Keywords (Paper-la kandippa iruka vendiya words)**
+- **Throughput & Latency**
+- **Synchronization & Mutual Exclusion**
+- **Scalability & Fault Tolerance**
+- **Temporal & Spatial Locality**
+
+Indha 4 keywords unga answer-la highlight aagi irundha, evaluator kandippa full marks poduvaaru! All the best! 🚀`;
+  }
+}
+
+async function handleStudyAgentRequest(req, res) {
+  try {
+    const { mode = "16-marks", topic, syllabus, text, notes, attachment, pdfBase64, model } = req.body;
+
+    let inputTopic = (topic || syllabus || text || notes || "").trim();
+    let extractedNotes = "";
+
+    // Handle uploaded attachment or PDF base64
+    if (attachment) {
+      if (attachment.extractedText) {
+        extractedNotes = attachment.extractedText.trim();
+      } else if (attachment.data) {
+        try {
+          let pdfParse = null;
+          try {
+            pdfParse = require("pdf-parse");
+          } catch (e) {
+            pdfParse = require(path.join(__dirname, "node_modules", "pdf-parse"));
+          }
+          if (pdfParse) {
+            const buffer = Buffer.from(attachment.data, "base64");
+            const parsed = await pdfParse(buffer);
+            extractedNotes = (parsed.text || "").trim();
+          }
+        } catch (pdfErr) {
+          console.warn("Backend PDF parse error:", pdfErr.message);
+        }
+      }
+    } else if (pdfBase64) {
+      try {
+        let pdfParse = null;
+        try {
+          pdfParse = require("pdf-parse");
+        } catch (e) {
+          pdfParse = require(path.join(__dirname, "node_modules", "pdf-parse"));
+        }
+        if (pdfParse) {
+          const buffer = Buffer.from(pdfBase64, "base64");
+          const parsed = await pdfParse(buffer);
+          extractedNotes = (parsed.text || "").trim();
+        }
+      } catch (pdfErr) {
+        console.warn("Backend pdfBase64 parse error:", pdfErr.message);
+      }
+    }
+
+    if (!inputTopic && !extractedNotes) {
+      return res.status(400).json({
+        error: "Please provide a subject topic/syllabus text or upload a notes PDF document."
+      });
+    }
+
+    const safeTopic = inputTopic || "Uploaded Anna University CSE Syllabus & Lecture Notes";
+    const promptMessage = buildStudyAgentPrompt(mode, safeTopic, extractedNotes);
+
+    const settings = readSettings();
+    const activeModel = (model || "gemini").toLowerCase();
+    const apiKey = resolveApiKey(activeModel, settings);
+
+    // Prepare models to attempt (requested model first, then any other configured live model)
+    const modelsToAttempt = [];
+    if (!isPlaceholderKey(apiKey)) {
+      modelsToAttempt.push({ model: activeModel, key: apiKey });
+    }
+
+    const otherModels = ["gemini", "groq", "openai", "claude"].filter(m => m !== activeModel);
+    for (const alt of otherModels) {
+      const altKey = resolveApiKey(alt, settings);
+      if (!isPlaceholderKey(altKey)) {
+        modelsToAttempt.push({ model: alt, key: altKey });
+      }
+    }
+
+    let finalResponse = null;
+    let lastError = null;
+
+    if (modelsToAttempt.length > 0) {
+      const aiPayload = {
+        message: promptMessage,
+        history: []
+      };
+
+      for (const candidate of modelsToAttempt) {
+        try {
+          finalResponse = await executeAiGeneration(candidate.model, candidate.key, aiPayload);
+          if (finalResponse) break;
+        } catch (err) {
+          lastError = err;
+          console.warn(`Study Agent AI attempt with ${candidate.model} failed:`, sanitizeError(err.message));
+        }
+      }
+    }
+
+    if (finalResponse) {
+      return res.json({
+        success: true,
+        mode,
+        topic: safeTopic,
+        response: finalResponse,
+        source: "live"
+      });
+    }
+
+    // High quality mock fallback
+    return res.json({
+      success: true,
+      mode,
+      topic: safeTopic,
+      response: getMockStudyAgentResponse(mode, safeTopic),
+      source: "mock"
+    });
+
+  } catch (error) {
+    console.error("Study Agent handler error:", sanitizeError(error.message));
+    return res.status(500).json({
+      error: "Failed to generate exam prep notes",
+      details: sanitizeError(error.message)
+    });
+  }
+}
+
+app.post(["/api/study-agent", "/api/v1/study-agent"], handleStudyAgentRequest);
+
 // History REST endpoints
 const HISTORY_FILE = path.join(__dirname, "data", "history.json");
 
@@ -790,6 +1250,7 @@ function startServer(port = PORT) {
   server = app.listen(port, () => {
     console.log(`KarthikAI Backend server running on http://localhost:${port}`);
     console.log(`- POST /api/v1/chat`);
+    console.log(`- POST /api/study-agent`);
   });
   return server;
 }

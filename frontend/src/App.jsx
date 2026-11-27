@@ -10,6 +10,7 @@ import { auth } from "./firebase";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const BACKEND_URL = `${API_BASE}/api/v1/chat`;
+const STUDY_AGENT_URL = `${API_BASE}/api/study-agent`;
 const HISTORY_URL = `${API_BASE}/api/v1/history`;
 const SETTINGS_URL = `${API_BASE}/api/v1/settings`;
 
@@ -336,6 +337,138 @@ export default function App() {
     }
   };
 
+  // Handle Study & Exam Prep Agent Requests
+  const handleStudyAgent = async (topic, mode, attachment) => {
+    if (!topic?.trim() && !attachment) return;
+
+    const modeLabels = {
+      "2-marks": "2-Mark Q&A (Part-A)",
+      "16-marks": "16-Mark Q&A (Part-B/C)",
+      "unit-summary": "Quick Revision Cheat Sheet",
+      "tanglish-explain": "Tanglish Explanation"
+    };
+
+    const label = modeLabels[mode] || mode;
+    const cleanTopic = topic?.trim() || attachment?.fileName || "CSE Topic";
+
+    const userPrompt = attachment
+      ? `🎓 **Anna University Exam Prep [${label}]**\n📌 **Topic**: ${cleanTopic}\n📎 **Attached Notes**: ${attachment.fileName}`
+      : `🎓 **Anna University Exam Prep [${label}]**\n📌 **Topic**: ${cleanTopic}`;
+
+    const userMessage = {
+      id: Date.now().toString(),
+      role: "user",
+      content: userPrompt,
+      timestamp: new Date().toISOString()
+    };
+
+    let targetConvId = currentConversationId;
+    let updatedConversations = [...conversations];
+    let newConv = null;
+
+    if (!targetConvId || !conversations.some(c => c.id === targetConvId)) {
+      targetConvId = Date.now().toString();
+      setCurrentConversationId(targetConvId);
+
+      newConv = {
+        id: targetConvId,
+        title: `[Exam Prep] ${cleanTopic.slice(0, 24)}`,
+        messages: [userMessage],
+        createdAt: new Date().toISOString()
+      };
+
+      updatedConversations = [newConv, ...conversations];
+      setConversations(updatedConversations);
+      saveConversationToBackend(newConv);
+    } else {
+      let updatedConv = null;
+      updatedConversations = conversations.map(c => {
+        if (c.id === targetConvId) {
+          updatedConv = {
+            ...c,
+            messages: [...c.messages, userMessage]
+          };
+          return updatedConv;
+        }
+        return c;
+      });
+      setConversations(updatedConversations);
+      if (updatedConv) {
+        saveConversationToBackend(updatedConv);
+      }
+    }
+
+    setIsLoading(true);
+
+    try {
+      const payloadAttachment = attachment ? {
+        data: attachment.data,
+        mimeType: attachment.mimeType,
+        extractedText: attachment.extractedText,
+        fileName: attachment.fileName
+      } : null;
+
+      const response = await fetch(STUDY_AGENT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: cleanTopic,
+          mode: mode || "16-marks",
+          attachment: payloadAttachment,
+          model: selectedModel
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || `Server error (${response.status})`);
+      }
+
+      const generatedNotes = data.response;
+      speakText(generatedNotes);
+
+      const aiMessage = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: generatedNotes,
+        timestamp: new Date().toISOString()
+      };
+
+      setConversations(prev => {
+        const target = prev.find(c => c.id === targetConvId);
+        if (!target) return prev;
+        const updated = {
+          ...target,
+          messages: [...target.messages, aiMessage]
+        };
+        saveConversationToBackend(updated);
+        return prev.map(c => c.id === targetConvId ? updated : c);
+      });
+
+    } catch (err) {
+      console.error("Study Agent error:", err);
+      const errorMessage = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: `⚠️ **Study Agent Error**\n\n${err.message || "Failed to generate exam prep notes."}`,
+        timestamp: new Date().toISOString()
+      };
+
+      setConversations(prev => {
+        const target = prev.find(c => c.id === targetConvId);
+        if (!target) return prev;
+        const updated = {
+          ...target,
+          messages: [...target.messages, errorMessage]
+        };
+        saveConversationToBackend(updated);
+        return prev.map(c => c.id === targetConvId ? updated : c);
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Switch conversation
   const handleSelectConversation = (id) => {
     if (window.speechSynthesis) window.speechSynthesis.cancel();
@@ -442,6 +575,7 @@ export default function App() {
         activeModel={selectedModel}
         onChangeModel={setSelectedModel}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onStudyAgent={handleStudyAgent}
       />
 
       {/* Glassmorphic Settings Modal */}
