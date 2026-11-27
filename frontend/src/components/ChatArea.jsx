@@ -83,14 +83,14 @@ export default function ChatArea({
   // Study Modes: "2-marks" | "16-marks" | "unit-summary" | "tanglish-explain"
   const [studyMode, setStudyMode] = useState("16-marks");
 
-  // Selected Model for Chat Bar: "gemini" | "hf"
+  // Selected Model for Chat Bar: "gemini" | "groq"
   const [inputModel, setInputModel] = useState(() => {
-    return activeModel === "hf" ? "hf" : "gemini";
+    return activeModel === "groq" || activeModel === "hf" ? "groq" : "gemini";
   });
 
   useEffect(() => {
-    if (activeModel === "hf" || activeModel === "gemini") {
-      setInputModel(activeModel);
+    if (activeModel === "groq" || activeModel === "hf" || activeModel === "gemini") {
+      setInputModel(activeModel === "hf" ? "groq" : activeModel);
     }
   }, [activeModel]);
 
@@ -431,8 +431,8 @@ export default function ChatArea({
               onChange={(e) => {
                 const val = e.target.value;
                 onChangeModel?.(val);
-                if (val === "hf" || val === "gemini") {
-                  setInputModel(val);
+                if (val === "groq" || val === "hf" || val === "gemini") {
+                  setInputModel(val === "hf" ? "groq" : val);
                 }
               }}
               className="model-dropdown-select glass-panel"
@@ -440,8 +440,7 @@ export default function ChatArea({
               disabled={isLoading}
             >
               <option value="gemini">Gemini (Default)</option>
-              <option value="hf">Hugging Face (Qwen 2.5)</option>
-              <option value="groq">Groq (LLaMA / GPT-OSS)</option>
+              <option value="groq">Groq (Llama 3.3 70B)</option>
               <option value="openai">OpenAI GPT-4o-mini</option>
               <option value="claude">Claude 3.5 Sonnet</option>
             </select>
@@ -636,7 +635,7 @@ export default function ChatArea({
               aria-label="Select Chat Model"
             >
               <option value="gemini">Gemini (Default)</option>
-              <option value="hf">Hugging Face (Qwen 2.5)</option>
+              <option value="groq">Groq (Llama 3.3 70B)</option>
             </select>
           </div>
         </div>

@@ -10,7 +10,8 @@ import { auth } from "./firebase";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const BACKEND_URL = `${API_BASE}/api/v1/chat`;
-const HF_CHAT_URL = `${API_BASE}/api/hf-chat`;
+const GROQ_CHAT_URL = `${API_BASE}/api/groq-chat`;
+const HF_CHAT_URL = `${API_BASE}/api/groq-chat`;
 const STUDY_AGENT_URL = `${API_BASE}/api/study-agent`;
 const HISTORY_URL = `${API_BASE}/api/v1/history`;
 const SETTINGS_URL = `${API_BASE}/api/v1/settings`;
@@ -242,8 +243,8 @@ export default function App() {
       }));
 
       const effectiveModel = modelOverride || selectedModel || "gemini";
-      const isHuggingFace = effectiveModel === "hf" || effectiveModel === "huggingface";
-      const targetEndpoint = isHuggingFace ? HF_CHAT_URL : BACKEND_URL;
+      const isGroq = effectiveModel === "groq" || effectiveModel === "hf" || effectiveModel === "huggingface";
+      const targetEndpoint = isGroq ? GROQ_CHAT_URL : BACKEND_URL;
 
       let promptMessage = text;
       let payloadAttachment = null;
@@ -267,11 +268,12 @@ export default function App() {
         }
       }
 
-      const requestPayload = isHuggingFace
+      const requestPayload = isGroq
         ? {
             message: promptMessage,
             history: apiHistory,
-            session_id: targetConvId
+            session_id: targetConvId,
+            model: "llama-3.3-70b-versatile"
           }
         : {
             message: promptMessage,

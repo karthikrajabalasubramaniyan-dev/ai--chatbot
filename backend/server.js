@@ -659,22 +659,22 @@ async function handleChatRequest(req, res) {
 app.post(["/api/v1/chat", "/api/chat"], handleChatRequest);
 
 // -------------------------------------------------------------
-// HUGGING FACE INFERENCE CHAT ENDPOINT (POST /api/hf-chat)
-// Direct router.huggingface.co OpenAI-compatible endpoint with multi-model fallback
+// GROQ CHAT ENDPOINT (POST /api/groq-chat, aliased to /api/hf-chat)
+// Ultra-fast OpenAI-compatible endpoint with multi-model cascade & Gemini fallback
 // -------------------------------------------------------------
-async function handleHfChatRequest(req, res) {
+async function handleGroqChatRequest(req, res) {
   const { message, history, session_id } = req.body;
 
   if (!message) {
     return res.status(400).json({ error: "Message is required" });
   }
 
-  const hfToken = (process.env.HF_TOKEN || "").trim();
+  const groqKey = (process.env.GROQ_API_KEY || "").trim();
 
-  if (!hfToken || isPlaceholderKey(hfToken)) {
+  if (!groqKey || isPlaceholderKey(groqKey)) {
     return res.json({
-      response: `[Hugging Face Qwen 2.5 Demo Response]:\n\nHello! I received your message: "${message}". To enable live Hugging Face inference, please set a valid HF_TOKEN in your backend .env file.`,
-      model: "Qwen/Qwen2.5-Coder-32B-Instruct",
+      response: `[Groq Demo Response]:\n\nHello! I received your message: "${message}". To enable live Groq inference, please set a valid GROQ_API_KEY in your backend .env file.`,
+      model: "llama-3.3-70b-versatile",
       session_id: session_id || "",
       source: "mock"
     });
@@ -683,7 +683,7 @@ async function handleHfChatRequest(req, res) {
   const messages = [
     {
       role: "system",
-      content: "You are KarthikAI, a helpful AI assistant powered by Qwen 2.5 on Hugging Face. Answer clearly, concisely, and accurately."
+      content: "You are KarthikAI, a helpful AI assistant powered by Groq. Answer clearly, concisely, and accurately."
     }
   ];
 
@@ -703,11 +703,13 @@ async function handleHfChatRequest(req, res) {
     content: message
   });
 
-  // Candidate models: Primary Qwen 2.5 Coder 32B, Secondary Llama 3.2 3B, Tertiary Qwen 2.5 7B
+  // Primary: llama-3.3-70b-versatile, Secondary: llama-3.1-8b-instant, then available high-speed Groq models
   const candidateModels = [
-    "Qwen/Qwen2.5-Coder-32B-Instruct",
-    "meta-llama/Llama-3.2-3B-Instruct",
-    "Qwen/Qwen2.5-7B-Instruct"
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
+    "qwen/qwen3.8-27b",
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b"
   ];
 
   let reply = null;
@@ -716,35 +718,36 @@ async function handleHfChatRequest(req, res) {
 
   for (const modelId of candidateModels) {
     try {
-      const response = await fetch("https://router.huggingface.co/v1/chat/completions", {
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${hfToken}`,
+          "Authorization": `Bearer ${groqKey}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
           model: modelId,
           messages: messages,
-          max_tokens: 500
+          max_tokens: 1024,
+          temperature: 0.7
         })
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`Hugging Face Router error [HTTP ${response.status} ${response.statusText}] for model ${modelId}:`, sanitizeError(errorText));
-        lastErrorDetail = `HTTP ${response.status} ${response.statusText}: ${errorText}`;
+        console.warn(`Groq API notice [HTTP ${response.status}] for model ${modelId}:`, sanitizeError(errorText));
+        lastErrorDetail = `HTTP ${response.status}: ${errorText}`;
         continue;
       }
 
       const data = await response.json();
       const content = data?.choices?.[0]?.message?.content;
-      if (content) {
+      if (content && content.trim()) {
         reply = content;
         successfulModel = modelId;
         break;
       }
     } catch (fetchErr) {
-      console.error(`Hugging Face Router fetch exception for model ${modelId}:`, sanitizeError(fetchErr.message));
+      console.warn(`Groq fetch exception for model ${modelId}:`, sanitizeError(fetchErr.message));
       lastErrorDetail = fetchErr.message;
     }
   }
@@ -752,14 +755,14 @@ async function handleHfChatRequest(req, res) {
   if (reply) {
     return res.json({
       response: reply,
-      model: successfulModel || "Qwen/Qwen2.5-Coder-32B-Instruct",
+      model: successfulModel || "llama-3.3-70b-versatile",
       session_id: session_id || "",
-      source: "huggingface"
+      source: "groq"
     });
   }
 
-  // If all Hugging Face router models fail, log exact status and fall back to Gemini
-  console.error("All Hugging Face Router models failed. Falling back to Gemini. Last error:", sanitizeError(lastErrorDetail || "Unknown error"));
+  // If all Groq models fail, log exact detail and fall back to Gemini
+  console.error("All Groq models failed. Falling back to Gemini. Last error:", sanitizeError(lastErrorDetail || "Unknown error"));
 
   let fallbackText = null;
   try {
@@ -768,7 +771,7 @@ async function handleHfChatRequest(req, res) {
     if (!isPlaceholderKey(geminiKey)) {
       const geminiReply = await generateGeminiResponse(geminiKey, { message, history });
       if (geminiReply) {
-        fallbackText = `${geminiReply}\n\n*(Note: Served via Gemini fallback. Hugging Face Router notice: ${sanitizeError(lastErrorDetail || "Service unavailable").split("\n")[0]})*`;
+        fallbackText = geminiReply;
       }
     }
   } catch (fallbackErr) {
@@ -776,19 +779,19 @@ async function handleHfChatRequest(req, res) {
   }
 
   if (!fallbackText) {
-    fallbackText = `**[KarthikAI • Hugging Face Qwen 2.5]**\n\nI processed your request: "${message}"\n\n*(Note: Hugging Face Router notice: ${sanitizeError(lastErrorDetail || "Service temporarily unavailable")}. Please verify your HF_TOKEN permissions or switch back to Gemini (Default).)*`;
+    fallbackText = `**[KarthikAI • Groq]**\n\nI processed your request: "${message}"\n\n*(Note: Groq notice: ${sanitizeError(lastErrorDetail || "Service temporarily unavailable")}. Please verify your GROQ_API_KEY or switch back to Gemini (Default).)*`;
   }
 
   return res.json({
     response: fallbackText,
-    model: "Qwen/Qwen2.5-Coder-32B-Instruct",
+    model: "llama-3.3-70b-versatile",
     session_id: session_id || "",
     source: "fallback",
-    error: sanitizeError(lastErrorDetail || "Hugging Face Inference Router error")
+    error: sanitizeError(lastErrorDetail || "Groq error")
   });
 }
 
-app.post(["/api/hf-chat", "/api/v1/hf-chat"], handleHfChatRequest);
+app.post(["/api/groq-chat", "/api/v1/groq-chat", "/api/hf-chat", "/api/v1/hf-chat"], handleGroqChatRequest);
 
 // -------------------------------------------------------------
 // ANNA UNIVERSITY CSE STUDY & EXAM PREP AGENT
@@ -1382,7 +1385,7 @@ function startServer(port = PORT) {
   server = app.listen(port, () => {
     console.log(`KarthikAI Backend server running on http://localhost:${port}`);
     console.log(`- POST /api/v1/chat`);
-    console.log(`- POST /api/hf-chat`);
+    console.log(`- POST /api/groq-chat`);
     console.log(`- POST /api/study-agent`);
   });
   return server;
