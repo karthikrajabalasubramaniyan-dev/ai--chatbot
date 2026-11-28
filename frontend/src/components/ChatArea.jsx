@@ -10,68 +10,6 @@ import { stopAudio, subscribeAudioState } from "../utils/audioService";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-const CHAT_SUGGESTIONS = [
-  {
-    icon: <Code size={18} className="suggest-icon code" />,
-    title: "Full-Stack Code",
-    text: "Modern React & Tailwind Component",
-    desc: "Build an accessible, animated UI component with clean state management.",
-    prompt: "Write a modern, accessible React component with Tailwind CSS styling and clean state management."
-  },
-  {
-    icon: <Sparkles size={18} className="suggest-icon sparkle" />,
-    title: "Deep Tech",
-    text: "Explain Transformers & Attention",
-    desc: "Understand neural networks and multi-head attention with intuitive analogies.",
-    prompt: "Explain how neural networks, transformers, and self-attention mechanisms work using intuitive real-world analogies."
-  },
-  {
-    icon: <GraduationCap size={18} className="suggest-icon table" />,
-    title: "Exam & Revision",
-    text: "OS Banker's Deadlock Algorithm",
-    desc: "Step-by-step avoidance algorithm breakdown with clear ASCII state diagrams.",
-    prompt: "Operating Systems: Explain Deadlock Prevention, Avoidance, and Banker's Algorithm with detailed ASCII diagram."
-  },
-  {
-    icon: <MessageSquare size={18} className="suggest-icon message" />,
-    title: "AI Innovation",
-    text: "Brainstorm 5 Next-Gen AI Apps",
-    desc: "Practical generative AI architecture blueprints with monetization roadmaps.",
-    prompt: "Give me 5 creative, practical ideas for generative AI applications with clear architecture and monetization strategies."
-  }
-];
-
-const STUDY_SUGGESTIONS = [
-  {
-    icon: <FileText size={18} className="suggest-icon sparkle" />,
-    title: "Part-A (2-Marks)",
-    text: "CN: TCP vs UDP Differences",
-    desc: "High-scoring concise points with comparison table for quick exam recall.",
-    prompt: "Computer Networks Unit 3: Differentiate between TCP and UDP protocols with comparison table."
-  },
-  {
-    icon: <BookOpen size={18} className="suggest-icon code" />,
-    title: "Part-B (16-Marks)",
-    text: "OS: Banker's Algorithm & Deadlock",
-    desc: "Structured university answer format with resource allocation matrix.",
-    prompt: "Operating Systems: Explain Deadlock Prevention, Avoidance, and Banker's Algorithm with detailed diagram."
-  },
-  {
-    icon: <Layers size={18} className="suggest-icon table" />,
-    title: "Quick Revision",
-    text: "DBMS: Normalization 1NF to BCNF",
-    desc: "Cheat sheet covering functional dependencies, candidate keys, and lossy checks.",
-    prompt: "Database Management Systems: Quick revision cheat sheet on Functional Dependency, 1NF, 2NF, 3NF, and BCNF."
-  },
-  {
-    icon: <Zap size={18} className="suggest-icon message" />,
-    title: "Tanglish Explain",
-    text: "CD: Lexical Analysis Phase",
-    desc: "Lexemes, tokens, and pattern matching explained in friendly beginner Tanglish.",
-    prompt: "Compiler Design: Explain Lexical Analysis phase, tokens, and lexemes in friendly beginner Tanglish."
-  }
-];
-
 const STUDY_QUICK_CHIPS = [
   "CN: TCP vs UDP",
   "OS: Banker's Algorithm",
@@ -552,25 +490,6 @@ export default function ChatArea({
                 : "Supercharged by Groq & Gemini with 25-year knowledge grounding, voice intelligence, and multimodal vision."
               }
             </p>
-
-            <div className="suggestions-grid">
-              {(appMode === "study" ? STUDY_SUGGESTIONS : CHAT_SUGGESTIONS).map((sug, idx) => (
-                <div
-                  key={idx}
-                  className="suggestion-card"
-                  onClick={() => handleSuggestionClick(sug.prompt)}
-                >
-                  <div className="suggestion-card-top">
-                    <div className="suggestion-icon-wrap">
-                      {sug.icon}
-                    </div>
-                    {sug.title && <span className="suggestion-title-tag">{sug.title}</span>}
-                  </div>
-                  <h3 className="suggestion-title">{sug.text}</h3>
-                  <p className="suggestion-desc">{sug.desc || sug.text}</p>
-                </div>
-              ))}
-            </div>
           </div>
         ) : (
           <div className="message-list">
@@ -1349,7 +1268,7 @@ export default function ChatArea({
             padding: 1rem 0.75rem;
           }
           .welcome-container {
-            margin: 1.5rem auto 0;
+            margin: auto auto;
             padding: 0 0.5rem;
           }
           .welcome-title {
@@ -1357,11 +1276,7 @@ export default function ChatArea({
           }
           .welcome-subtitle {
             font-size: 0.9rem;
-            margin-bottom: 1.5rem;
-          }
-          .suggestions-grid {
-            grid-template-columns: 1fr;
-            gap: 8px;
+            margin-bottom: 0;
           }
           .chat-input-container {
             padding: 0 0.75rem 0.75rem;
@@ -1431,6 +1346,7 @@ export default function ChatArea({
             padding-bottom: 1rem;
           }
           .welcome-container {
+            margin: auto auto;
             padding: 1rem 0.25rem;
           }
           .welcome-title {
@@ -1438,7 +1354,7 @@ export default function ChatArea({
           }
           .welcome-subtitle {
             font-size: 0.85rem;
-            margin-bottom: 1.25rem;
+            margin-bottom: 0;
           }
           .bento-status-pill {
             font-size: 0.72rem;
