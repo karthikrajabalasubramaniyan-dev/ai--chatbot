@@ -536,7 +536,7 @@ export default function App() {
   if (authLoading) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", color: "var(--text-main)" }}>
-        Loading KarthikAI...
+        Loading VEXA...
       </div>
     );
   }

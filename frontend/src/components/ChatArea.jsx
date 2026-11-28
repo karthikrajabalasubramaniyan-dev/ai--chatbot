@@ -427,9 +427,9 @@ export default function ChatArea({
           </button>
 
           <div className="header-title-container">
-            <h2 className="header-title">{conversation?.title || (appMode === "study" ? "Anna University CSE Exam Prep" : "KarthikAI Chat")}</h2>
+            <h2 className="header-title">{conversation?.title || (appMode === "study" ? "Anna University CSE Exam Prep" : "VEXA")}</h2>
             <span className={`header-badge ${appMode === "study" ? "study-badge" : ""}`}>
-              {isLoading ? "Thinking..." : appMode === "study" ? "🎓 Anna University CSE" : "KarthikAI Active"}
+              {isLoading ? "Thinking..." : appMode === "study" ? "🎓 Anna University CSE" : "VEXA Active"}
             </span>
           </div>
         </div>
@@ -658,7 +658,7 @@ export default function ChatArea({
                     ? "Transcribing voice input..."
                     : appMode === "study"
                       ? `Enter topic (e.g. 'Operating Systems - Deadlocks') for ${studyMode === "2-marks" ? "2-Mark Q&A" : studyMode === "16-marks" ? "16-Mark Answers" : studyMode === "unit-summary" ? "Quick Revision" : "Tanglish Explanation"}...`
-                      : "Ask KarthikAI anything (2001–2026 Live Knowledge)..."
+                      : "Ask VEXA anything (2001–2026 Live Knowledge)..."
             }
             className={`command-textarea ${voiceStatus === "listening" ? "textarea-listening" : ""} ${voiceStatus === "processing" ? "textarea-processing" : ""}`}
             disabled={isLoading || voiceStatus === "processing" || isParsing}
@@ -764,7 +764,7 @@ export default function ChatArea({
           <p className="input-disclaimer">
             {appMode === "study"
               ? "Anna University CSE Exam Specialist • Covers 2-Marks, 16-Marks with diagrams, Revision Cheat Sheets & Tanglish explanations."
-              : "KarthikAI Obsidian & Emerald Bento • 2001–2026 Grounded Intelligence"
+              : "VEXA Obsidian & Emerald Bento • 2001–2026 Grounded Intelligence"
             }
           </p>
         )}

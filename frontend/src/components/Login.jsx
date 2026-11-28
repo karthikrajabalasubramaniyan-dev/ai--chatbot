@@ -49,14 +49,14 @@ function Login() {
   return (
     <div className="karthikai-auth-container">
       <div className="karthikai-glass-panel">
-        {/* KarthikAI Logo */}
+        {/* VEXA Logo */}
         <img
           src="/karthikai-logo.png"
-          alt="KarthikAI Logo"
+          alt="VEXA Logo"
           className="karthikai-login-logo"
         />
 
-        <h1 className="karthikai-title">KarthikAI</h1>
+        <h1 className="karthikai-title">VEXA</h1>
 
         <p className="karthikai-subtitle">
           {isSignup
@@ -95,8 +95,8 @@ function Login() {
             {loading
               ? "Please wait..."
               : isSignup
-              ? "Create Account"
-              : "Login"}
+                ? "Create Account"
+                : "Login"}
           </button>
         </form>
 

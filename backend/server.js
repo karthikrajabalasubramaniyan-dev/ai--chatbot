@@ -25,7 +25,7 @@ const PORT = process.env.PORT || 5000;
 app.get("/", (req, res) => {
   res.json({
     status: "Running",
-    message: "KarthikAI Chatbot Backend API",
+    message: "VEXA Chatbot Backend API",
     version: "2.1.0"
   });
 });
@@ -226,7 +226,7 @@ app.post(["/api/settings", "/api/v1/settings"], (req, res) => {
 
 // Mock responses for testing when API key is missing
 const mockResponses = [
-  "Hello! I am KarthikAI Assistant. How can I help you today?",
+  "Hello! I am VEXA, your AI assistant built by Karthik Raja. How can I help you today?",
   "That is an interesting question. In a production environment, I connect to real-time AI APIs to give you accurate insights.",
   "Here is some formatted code for you:\n\n```javascript\nfunction greet(name) {\n  console.log(`Hello, ${name}!`);\n}\n\ngreet('Developer');\n```",
   "I am ready to help you with coding, writing, and general questions."
@@ -244,10 +244,10 @@ function getMockResponse(userMessage, model) {
   const msg = userMessage.toLowerCase().trim();
 
   if (msg.includes("hello") || msg.includes("hi") || msg.includes("hey")) {
-    return prefix + "Hello there! I'm your KarthikAI assistant. Ask me anything or let me assist you with coding and answers!";
+    return prefix + "Hello there! I'm VEXA, your AI assistant built by Karthik Raja. Ask me anything or let me assist you with coding and answers!";
   }
-  if (msg.includes("who are you") || msg.includes("your name")) {
-    return prefix + "I am KarthikAI, an AI assistant built to help you with questions, coding, and everyday tasks.";
+  if (msg.includes("who are you") || msg.includes("your name") || msg.includes("who made you") || msg.includes("who created you")) {
+    return prefix + "I am VEXA, an AI intelligence assistant built by Karthik Raja to help you with questions, coding, research, and everyday tasks.";
   }
 
   const resp = mockResponses[mockCounter % mockResponses.length];
@@ -258,7 +258,7 @@ function getMockResponse(userMessage, model) {
 // -------------------------------------------------------------
 // SHARED HELPER: build the 25-year knowledge system prompt
 // -------------------------------------------------------------
-function buildKnowledgeSystemPrompt(role = "KarthikAI, a helpful AI assistant") {
+function buildKnowledgeSystemPrompt(role = "VEXA, an advanced AI intelligence assistant created and built by Karthik Raja") {
   const now = new Date();
   const currentDateFull = now.toLocaleDateString("en-IN", { dateStyle: "full" });
   const currentDateTime = now.toLocaleString("en-IN", {
@@ -268,6 +268,12 @@ function buildKnowledgeSystemPrompt(role = "KarthikAI, a helpful AI assistant") 
   });
 
   return `You are ${role}.
+
+IDENTITY & CREATOR:
+- Your name is VEXA.
+- You were developed, created, and built by Karthik Raja.
+- When asked who you are, what your name is, or who created/made you, proudly state that you are VEXA, created and built by Karthik Raja.
+
 Today's exact date and time (India): ${currentDateTime}.
 
 KNOWLEDGE SCOPE:
@@ -358,7 +364,7 @@ async function generateGroqResponse(apiKey, { message, history, liveSearch = tru
   const messages = [
     {
       role: "system",
-      content: buildKnowledgeSystemPrompt("KarthikAI, a helpful AI assistant")
+      content: buildKnowledgeSystemPrompt("VEXA, an advanced AI intelligence assistant created and built by Karthik Raja")
     }
   ];
 
@@ -431,7 +437,7 @@ async function generateGeminiResponse(apiKey, { message, history, attachment, us
     });
   }
 
-  const systemPrompt = buildKnowledgeSystemPrompt("KarthikAI, a helpful AI assistant");
+  const systemPrompt = buildKnowledgeSystemPrompt("VEXA, an advanced AI intelligence assistant created and built by Karthik Raja");
 
   // Models that support googleSearch grounding (Gemini 1.5+)
   const groundingModels = [
@@ -503,7 +509,7 @@ async function generateGeminiResponse(apiKey, { message, history, attachment, us
 }
 
 async function generateOpenAiResponse(apiKey, { message, history, attachment }) {
-  const systemPrompt = "You are KarthikAI, a helpful AI assistant. Answer clearly, concisely, and accurately.";
+  const systemPrompt = "You are VEXA, an advanced AI assistant created and built by Karthik Raja. Answer clearly, concisely, and accurately.";
 
   const messages = [
     { role: "system", content: systemPrompt }
@@ -579,7 +585,7 @@ async function generateOpenAiResponse(apiKey, { message, history, attachment }) 
 }
 
 async function generateClaudeResponse(apiKey, { message, history, attachment }) {
-  const systemPrompt = "You are KarthikAI, a helpful AI assistant. Answer clearly, concisely, and accurately.";
+  const systemPrompt = "You are VEXA, an advanced AI assistant created and built by Karthik Raja. Answer clearly, concisely, and accurately.";
 
   const rawMessages = [];
   if (history && Array.isArray(history)) {
@@ -897,7 +903,7 @@ async function handleGroqChatRequest(req, res) {
   const messages = [
     {
       role: "system",
-      content: buildKnowledgeSystemPrompt("KarthikAI, a helpful AI assistant powered by Groq")
+      content: buildKnowledgeSystemPrompt("VEXA, an advanced AI intelligence assistant powered by Groq and created by Karthik Raja")
     }
   ];
 
@@ -1023,7 +1029,7 @@ async function handleGroqChatRequest(req, res) {
   }
 
   if (!fallbackText) {
-    fallbackText = `**[KarthikAI • Vision]**\n\nI received your request${hasImage ? " and image" : ""}: "${effectiveMessage}"\n\n*(Note: Vision model notice: ${sanitizeError(lastErrorDetail || "Service temporarily unavailable")}. Please verify your API keys or switch to Gemini (Default).)*`;
+    fallbackText = `**[VEXA • Vision]**\n\nI received your request${hasImage ? " and image" : ""}: "${effectiveMessage}"\n\n*(Note: Vision model notice: ${sanitizeError(lastErrorDetail || "Service temporarily unavailable")}. Please verify your API keys or switch to Gemini (Default).)*`;
   }
 
   return res.json({
@@ -1124,7 +1130,7 @@ STRICT FORMAT & CRITERIA:
       modeSpecificRules = `Generate structured Anna University CSE examination study notes for: "${topic}".`;
   }
 
-  return `You are KarthikAI, an elite Anna University CSE Semester Exam Preparation Expert & Tutor.
+  return `You are VEXA, an elite Anna University CSE Semester Exam Preparation Expert & Tutor created and built by Karthik Raja.
 Help students score 'O' (Outstanding) or 'A+' grades in their university theory exams.
 
 ${modeSpecificRules}
@@ -1770,7 +1776,7 @@ let server;
 
 function startServer(port = PORT) {
   server = app.listen(port, () => {
-    console.log(`KarthikAI Backend server running on http://localhost:${port}`);
+    console.log(`VEXA Backend server running on http://localhost:${port}`);
     console.log(`- POST /api/v1/chat`);
     console.log(`- POST /api/groq-chat`);
     console.log(`- POST /api/study-agent`);
