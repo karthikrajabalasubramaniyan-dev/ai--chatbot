@@ -3,6 +3,7 @@ import Sidebar from "./components/Sidebar";
 import ChatArea from "./components/ChatArea";
 import SettingsModal from "./components/SettingsModal";
 import { PanelLeft } from "lucide-react";
+import { stopAudio } from "./utils/audioService";
 
 import Login from "./components/Login";
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -169,12 +170,7 @@ export default function App() {
   const activeConversation = conversations.find(c => c.id === currentConversationId) || null;
 
   const speakText = (text) => {
-    if (!window.speechSynthesis) return;
-    const cleanText = (text || "").replace(/[*#_`>]/g, "").trim();
-    const speech = new SpeechSynthesisUtterance(cleanText);
-    speech.lang = "en-IN";
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(speech);
+    // Audio voice-over is available on-demand via the 'Read' button on each message bubble
   };
 
   // Handle sending a new message
@@ -182,7 +178,7 @@ export default function App() {
     if (!text.trim()) return;
 
     const isImage = attachment && attachment.mimeType?.startsWith("image/");
-    const userContent = attachment 
+    const userContent = attachment
       ? isImage
         ? `🖼️ **Image**: ${attachment.fileName}\n\n${text}`
         : `📎 **Document**: ${attachment.fileName}\n\n${text}`
@@ -203,14 +199,14 @@ export default function App() {
     if (!targetConvId || !conversations.some(c => c.id === targetConvId)) {
       targetConvId = Date.now().toString();
       setCurrentConversationId(targetConvId);
-      
+
       newConv = {
         id: targetConvId,
         title: text.length > 30 ? text.substring(0, 30) + "..." : text,
         messages: [userMessage],
         createdAt: new Date().toISOString()
       };
-      
+
       updatedConversations = [newConv, ...conversations];
       setConversations(updatedConversations);
       saveConversationToBackend(newConv);
@@ -270,20 +266,20 @@ export default function App() {
 
       const requestPayload = isGroq
         ? {
-            message: promptMessage,
-            history: apiHistory,
-            session_id: targetConvId,
-            model: "llama-3.3-70b-versatile",
-            liveWeb: liveWeb !== false
-          }
+          message: promptMessage,
+          history: apiHistory,
+          session_id: targetConvId,
+          model: "llama-3.3-70b-versatile",
+          liveWeb: liveWeb !== false
+        }
         : {
-            message: promptMessage,
-            history: apiHistory,
-            session_id: targetConvId,
-            model: effectiveModel,
-            attachment: payloadAttachment,
-            liveWeb: liveWeb !== false
-          };
+          message: promptMessage,
+          history: apiHistory,
+          session_id: targetConvId,
+          model: effectiveModel,
+          attachment: payloadAttachment,
+          liveWeb: liveWeb !== false
+        };
 
       const response = await fetch(targetEndpoint, {
         method: "POST",
@@ -310,7 +306,7 @@ export default function App() {
       }
 
       speakText(data.response);
-      
+
       const aiMessage = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
@@ -491,18 +487,18 @@ export default function App() {
 
   // Switch conversation
   const handleSelectConversation = (id) => {
-    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    stopAudio();
     setCurrentConversationId(id);
     setIsMobileSidebarOpen(false);
   };
 
   // Delete conversation
   const handleDeleteConversation = (id) => {
-    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    stopAudio();
     const filtered = conversations.filter(c => c.id !== id);
     setConversations(filtered);
     deleteConversationFromBackend(id);
-    
+
     if (currentConversationId === id) {
       setCurrentConversationId(filtered.length > 0 ? filtered[0].id : null);
     }
@@ -521,7 +517,7 @@ export default function App() {
 
   // Start a new blank chat
   const handleNewChat = () => {
-    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    stopAudio();
     setCurrentConversationId(null);
     setIsMobileSidebarOpen(false);
   };
@@ -606,7 +602,8 @@ export default function App() {
         onSave={handleSaveSettings}
       />
 
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         .open-sidebar-btn {
           position: absolute;
           top: 11px;

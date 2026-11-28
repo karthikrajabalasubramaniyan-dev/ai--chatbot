@@ -2,7 +2,22 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const fs = require("fs");
+const multer = require("multer");
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 }
+});
 require("dotenv").config({ path: path.join(__dirname, ".env") });
+
+let MsEdgeTTS;
+let OUTPUT_FORMAT;
+try {
+  const edgeTts = require("msedge-tts");
+  MsEdgeTTS = edgeTts.MsEdgeTTS;
+  OUTPUT_FORMAT = edgeTts.OUTPUT_FORMAT;
+} catch (e) {
+  console.warn("msedge-tts not yet loaded:", e.message);
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -1435,50 +1450,192 @@ app.delete(["/api/history", "/api/v1/history"], (req, res) => {
   res.json({ success: true });
 });
 
-// Transcribe audio using Gemini
-app.post(["/api/transcribe", "/api/v1/transcribe"], async (req, res) => {
-  const { audio, mimeType, language } = req.body;
+// -------------------------------------------------------------
+// TEXT-TO-SPEECH (TTS) & SPEECH-TO-TEXT (STT / TRANSCRIBE)
+// -------------------------------------------------------------
 
-  if (!audio) {
-    return res.status(400).json({ error: "Audio data is required" });
+// Clean markdown characters and symbols for natural, fluent voice output
+function cleanTextForSpeech(text) {
+  if (!text || typeof text !== "string") return "";
+  return text
+    // Remove multi-line code blocks
+    .replace(/```[\s\S]*?```/g, " ")
+    // Remove inline code ticks
+    .replace(/`([^`]+)`/g, "$1")
+    // Remove markdown links & images, keeping label
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    // Remove headings (#, ##, etc.)
+    .replace(/^#{1,6}\s+/gm, "")
+    // Remove bold and italic markers (*, _)
+    .replace(/[*_]{1,3}([^*_]+)[*_]{1,3}/g, "$1")
+    .replace(/[*_]/g, "")
+    // Remove blockquotes and list bullets
+    .replace(/^[>*\-+]\s+/gm, "")
+    // Remove table formatting and pipes
+    .replace(/\|/g, " ")
+    .replace(/[-:]{3,}/g, "")
+    // Remove HTML tags
+    .replace(/<[^>]+>/g, "")
+    // Remove URLs
+    .replace(/https?:\/\/\S+/g, "")
+    // Remove multiple symbols and normalize whitespace
+    .replace(/[~^\\#]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// POST /api/tts: Natural Neural Voice Output (Edge TTS)
+app.post(["/api/tts", "/api/v1/tts"], async (req, res) => {
+  const { text, lang } = req.body;
+
+  if (!text || !text.trim()) {
+    return res.status(400).json({ error: "Text is required for TTS synthesis" });
   }
 
-  const settings = readSettings();
-  const apiKey = settings.apiKeys.gemini || process.env.GEMINI_API_KEY;
-
-  if (!apiKey || apiKey === "your_gemini_api_key_here") {
-    setTimeout(() => {
-      res.json({ text: "Hello! This is a mock transcription because your API key is not configured." });
-    }, 1200);
-    return;
+  const cleanedText = cleanTextForSpeech(text);
+  if (!cleanedText) {
+    return res.status(400).json({ error: "No speakable text found after stripping markdown" });
   }
+
+  // Detect Tamil script or explicit Tamil language request
+  const hasTamil = /[\u0B80-\u0BFF]/.test(cleanedText);
+  const isTamil = hasTamil || (lang && (lang.startsWith("ta") || lang.toLowerCase().includes("tamil")));
+
+  // Voice Selection: Tamil -> ta-IN-PallaviNeural, English (India) -> en-IN-PrabhatNeural or en-IN-NeerjaNeural
+  const voice = isTamil ? "ta-IN-PallaviNeural" : "en-IN-PrabhatNeural";
 
   try {
-    const { GoogleGenerativeAI } = require("@google/generative-ai");
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    if (!MsEdgeTTS) {
+      const edgeTts = require("msedge-tts");
+      MsEdgeTTS = edgeTts.MsEdgeTTS;
+      OUTPUT_FORMAT = edgeTts.OUTPUT_FORMAT;
+    }
 
-    const langHint = language === "ta-IN" ? "Tamil" : "English";
+    const tts = new MsEdgeTTS();
+    await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
 
-    const result = await model.generateContent([
-      {
-        inlineData: {
-          data: audio,
-          mimeType: mimeType || "audio/webm"
-        }
-      },
-      `Provide only the transcription of this audio. The language spoken is likely ${langHint}. Do not add any introductory or explanatory text, formatting, or commentary. Output only the verbatim words spoken in the audio.`
-    ]);
+    // Limit text to 4000 characters to keep synthesis snappy and responsive
+    const speakText = cleanedText.length > 4000 ? cleanedText.slice(0, 4000) + "..." : cleanedText;
 
-    const transcription = result.response.text().trim();
-    res.json({ text: transcription });
-  } catch (error) {
-    console.error("Transcription API error:", error);
-    res.status(500).json({
-      error: "Failed to transcribe audio",
-      details: error.message
+    const { audioStream } = tts.toStream(speakText);
+
+    res.setHeader("Content-Type", "audio/mpeg");
+    res.setHeader("Accept-Ranges", "bytes");
+    res.setHeader("Cache-Control", "no-cache");
+
+    audioStream.on("error", (streamErr) => {
+      console.error("MsEdgeTTS stream error:", streamErr);
+      if (!res.headersSent) {
+        res.status(500).json({ error: "TTS audio streaming failed", details: streamErr.message });
+      }
     });
+
+    audioStream.pipe(res);
+  } catch (err) {
+    console.error("MsEdgeTTS synthesis error:", err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "TTS generation failed", details: err.message });
+    }
   }
+});
+
+// POST /api/transcribe: Groq Whisper STT (whisper-large-v3-turbo) with Gemini fallback
+app.post(["/api/transcribe", "/api/v1/transcribe"], upload.any(), async (req, res) => {
+  let audioBuffer = null;
+  let mimeType = "audio/webm";
+  let fileName = "audio.webm";
+  let language = req.body?.language || "en-US";
+
+  // Handle multipart file upload via multer
+  if (req.files && req.files.length > 0) {
+    const file = req.files[0];
+    audioBuffer = file.buffer;
+    mimeType = file.mimetype || "audio/webm";
+    fileName = file.originalname || "audio.webm";
+  } else if (req.file) {
+    audioBuffer = req.file.buffer;
+    mimeType = req.file.mimetype || "audio/webm";
+    fileName = req.file.originalname || "audio.webm";
+  } else if (req.body?.audio) {
+    // Handle base64 audio JSON payload
+    audioBuffer = Buffer.from(req.body.audio, "base64");
+    mimeType = req.body.mimeType || "audio/webm";
+  }
+
+  if (!audioBuffer || audioBuffer.length === 0) {
+    return res.status(400).json({ error: "Audio data or file is required" });
+  }
+
+  const groqKey = (process.env.GROQ_API_KEY || "").trim();
+
+  // Primary: Groq Whisper API (whisper-large-v3-turbo)
+  if (groqKey && !isPlaceholderKey(groqKey)) {
+    try {
+      const formData = new FormData();
+      const audioBlob = new Blob([audioBuffer], { type: mimeType });
+      formData.append("file", audioBlob, fileName.endsWith(".webm") ? fileName : "recording.webm");
+      formData.append("model", "whisper-large-v3-turbo");
+
+      // Set language hint if Tamil is requested (Whisper uses ISO-639-1 code 'ta')
+      if (language && (language.startsWith("ta") || language.toLowerCase().includes("tamil"))) {
+        formData.append("language", "ta");
+      }
+
+      const groqRes = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${groqKey}`
+        },
+        body: formData
+      });
+
+      if (groqRes.ok) {
+        const groqData = await groqRes.json();
+        const transcription = (groqData.text || "").trim();
+        return res.json({ text: transcription, provider: "groq-whisper" });
+      } else {
+        const errText = await groqRes.text();
+        console.warn(`Groq Whisper notice [HTTP ${groqRes.status}]:`, sanitizeError(errText));
+      }
+    } catch (groqErr) {
+      console.warn("Groq Whisper exception, attempting Gemini fallback:", sanitizeError(groqErr.message));
+    }
+  }
+
+  // Fallback: Gemini audio transcription
+  try {
+    const settings = readSettings();
+    const apiKey = resolveApiKey("gemini", settings);
+    if (apiKey && !isPlaceholderKey(apiKey)) {
+      const { GoogleGenerativeAI } = require("@google/generative-ai");
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const langHint = language === "ta-IN" ? "Tamil" : "English";
+
+      const base64Audio = audioBuffer.toString("base64");
+      const result = await model.generateContent([
+        {
+          inlineData: {
+            data: base64Audio,
+            mimeType: mimeType || "audio/webm"
+          }
+        },
+        `Provide only the verbatim transcription of this audio. The language spoken is likely ${langHint} or Tanglish. Do not add any introductory or explanatory text, formatting, or commentary.`
+      ]);
+
+      const transcription = result.response.text().trim();
+      return res.json({ text: transcription, provider: "gemini" });
+    }
+  } catch (geminiErr) {
+    console.error("Gemini transcription fallback exception:", sanitizeError(geminiErr.message));
+  }
+
+  // Safe mock response if all remote keys fail
+  return res.json({
+    text: "Hello! Audio received, but transcription requires a valid GROQ_API_KEY or GEMINI_API_KEY.",
+    provider: "fallback"
+  });
 });
 
 let server;

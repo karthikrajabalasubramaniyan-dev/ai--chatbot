@@ -1,21 +1,22 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { User, Bot, Copy, Check, Volume2, VolumeX, Globe } from "lucide-react";
+import { playNeuralTTS, stopAudio, subscribeAudioState } from "../utils/audioService";
 
 // Preprocess markdown to ensure table blocks have proper newline boundaries, matching columns and blank lines
 function preprocessMarkdown(content) {
   if (!content || typeof content !== "string") return "";
-  
+
   // Normalize CRLF to LF
   const formatted = content.replace(/\r\n/g, "\n");
   const lines = formatted.split("\n");
   const processedLines = [];
-  
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const trim = line.trim();
-    
+
     // Check if current line contains pipes and looks like a table header
     const hasPipes = trim.includes("|");
     if (hasPipes && i + 1 < lines.length) {
@@ -26,23 +27,23 @@ function preprocessMarkdown(content) {
         let normalizedHeader = trim;
         if (!normalizedHeader.startsWith("|")) normalizedHeader = "| " + normalizedHeader;
         if (!normalizedHeader.endsWith("|")) normalizedHeader = normalizedHeader + " |";
-        
+
         // Count columns in header
         const headerCols = normalizedHeader.split("|").filter((_, idx, arr) => idx > 0 && idx < arr.length - 1).length;
-        
+
         // Ensure blank line before table if previous line is not blank
         if (processedLines.length > 0 && processedLines[processedLines.length - 1].trim() !== "") {
           processedLines.push("");
         }
-        
+
         processedLines.push(normalizedHeader);
-        
+
         // Generate valid matching separator with exact column count
         const fixedSep = "| " + Array(Math.max(headerCols, 1)).fill("---").join(" | ") + " |";
         processedLines.push(fixedSep);
-        
+
         i++; // skip original separator row
-        
+
         // Consume following table data rows and ensure they start and end with | and retain separate newlines
         while (i + 1 < lines.length) {
           const nextRow = lines[i + 1];
@@ -57,7 +58,7 @@ function preprocessMarkdown(content) {
             break;
           }
         }
-        
+
         // Ensure blank line after table
         if (i + 1 < lines.length && lines[i + 1].trim() !== "") {
           processedLines.push("");
@@ -65,10 +66,10 @@ function preprocessMarkdown(content) {
         continue;
       }
     }
-    
+
     processedLines.push(line);
   }
-  
+
   return processedLines.join("\n");
 }
 
@@ -103,62 +104,25 @@ export default function MessageItem({ message }) {
   const [copied, setCopied] = useState(false);
   const [isSpeakingThis, setIsSpeakingThis] = useState(false);
 
-  // Stop speaking tracker when global cancel is called
-  React.useEffect(() => {
-    const handleGlobalStop = () => {
-      setIsSpeakingThis(false);
-    };
-    
-    // Since cancel triggers onend/onerror, we monitor global states.
-    // If the browser stops speaking, toggle this indicator off.
-    const interval = setInterval(() => {
-      if (isSpeakingThis && window.speechSynthesis && !window.speechSynthesis.speaking) {
-        setIsSpeakingThis(false);
-      }
-    }, 250);
-
-    return () => clearInterval(interval);
-  }, [isSpeakingThis]);
+  // Sync speaking state with centralized neural audioService
+  useEffect(() => {
+    const unsubscribe = subscribeAudioState((isSpeaking, activeId) => {
+      setIsSpeakingThis(isSpeaking && activeId === message.id);
+    });
+    return unsubscribe;
+  }, [message.id]);
 
   const handleReadAloud = () => {
-    if (!window.speechSynthesis) {
-      alert("Text-to-speech is not supported in this browser.");
+    if (isSpeakingThis) {
+      stopAudio();
       return;
     }
 
-    if (window.speechSynthesis.speaking) {
-      window.speechSynthesis.cancel();
-      if (isSpeakingThis) {
-        setIsSpeakingThis(false);
-        return;
-      }
-    }
+    // Auto-detect language: if Tamil characters match, synthesize in Tamil, else Indian English
+    const hasTamil = /[\u0B80-\u0BFF]/.test(message.content);
+    const lang = hasTamil ? "ta-IN" : "en-IN";
 
-    // Clean markdown characters from synthesis input
-    const cleanText = message.content
-      .replace(/[*#`_\-]/g, "") 
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") 
-      .trim();
-
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    
-    // Auto-detect language: if Tamil characters match, speak in Tamil, else English
-    const hasTamil = /[\u0B80-\u0BFF]/.test(cleanText);
-    utterance.lang = hasTamil ? "ta-IN" : "en-US";
-
-    utterance.onstart = () => {
-      setIsSpeakingThis(true);
-    };
-
-    utterance.onend = () => {
-      setIsSpeakingThis(false);
-    };
-
-    utterance.onerror = () => {
-      setIsSpeakingThis(false);
-    };
-
-    window.speechSynthesis.speak(utterance);
+    playNeuralTTS(message.content, lang, message.id);
   };
 
   const handleCopyMessage = () => {
@@ -196,7 +160,7 @@ export default function MessageItem({ message }) {
     code({ node, inline, className, children, ...props }) {
       const match = /language-(\w+)/.exec(className || "");
       const isInline = !className || !className.startsWith("language-");
-      
+
       if (!isInline && match) {
         return (
           <CodeBlock
@@ -220,7 +184,7 @@ export default function MessageItem({ message }) {
           <Bot size={18} />
         </div>
       )}
-      
+
       <div className="bubble-container">
         <div className={`message-bubble ${isUser ? "user-bubble" : "ai-bubble glass-panel"}`}>
           {isUser ? (
@@ -232,7 +196,7 @@ export default function MessageItem({ message }) {
               </ReactMarkdown>
             </div>
           )}
-          
+
           {/* Voice read-aloud and Copy response buttons for AI responses */}
           {!isUser && (
             <div className="bubble-actions" style={{ gap: '8px' }}>
@@ -252,8 +216,8 @@ export default function MessageItem({ message }) {
                 <span>{isSpeakingThis ? "Stop" : "Read"}</span>
               </button>
 
-              <button 
-                className={`bubble-action-btn ${copied ? "copied" : ""}`} 
+              <button
+                className={`bubble-action-btn ${copied ? "copied" : ""}`}
                 onClick={handleCopyMessage}
                 title="Copy entire response"
               >
@@ -263,7 +227,7 @@ export default function MessageItem({ message }) {
             </div>
           )}
         </div>
-        
+
         <span className="timestamp">
           {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </span>
@@ -275,7 +239,8 @@ export default function MessageItem({ message }) {
         </div>
       )}
 
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         .message-row {
           display: flex;
           margin-bottom: 1.5rem;

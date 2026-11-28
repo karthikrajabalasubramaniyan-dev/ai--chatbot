@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import MessageItem from "./MessageItem";
 import TypingIndicator from "./TypingIndicator";
+import { stopAudio, subscribeAudioState } from "../utils/audioService";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -126,12 +127,10 @@ export default function ChatArea({
   }, []);
 
   useEffect(() => {
-    const checkSpeaking = setInterval(() => {
-      if (window.speechSynthesis) {
-        setIsSpeaking(window.speechSynthesis.speaking);
-      }
-    }, 250);
-    return () => clearInterval(checkSpeaking);
+    const unsubscribe = subscribeAudioState((speaking) => {
+      setIsSpeaking(speaking);
+    });
+    return unsubscribe;
   }, []);
 
   const startRecording = async () => {
@@ -167,24 +166,13 @@ export default function ChatArea({
         setVoiceStatus("processing");
 
         try {
-          const base64Audio = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(audioBlob);
-            reader.onloadend = () => {
-              const base64data = reader.result.split(",")[1];
-              resolve(base64data);
-            };
-            reader.onerror = reject;
-          });
+          const formData = new FormData();
+          formData.append("file", audioBlob, "recording.webm");
+          formData.append("language", voiceLanguage);
 
-          const response = await fetch(`${API_BASE}/api/v1/transcribe`, {
+          const response = await fetch(`${API_BASE}/api/transcribe`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              audio: base64Audio,
-              mimeType: "audio/webm",
-              language: voiceLanguage
-            })
+            body: formData
           });
 
           if (!response.ok) throw new Error(`Server error: ${response.status}`);
@@ -248,10 +236,8 @@ export default function ChatArea({
   };
 
   const handleStopSpeaking = () => {
-    if (window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-      setIsSpeaking(false);
-    }
+    stopAudio();
+    setIsSpeaking(false);
   };
 
   const messages = conversation?.messages || [];
@@ -1537,6 +1523,27 @@ export default function ChatArea({
           background-color: #ef4444;
           box-shadow: 0 0 12px rgba(239, 68, 68, 0.5);
           animation: pulse 1.4s infinite ease-in-out;
+        }
+
+        .mic-btn.processing {
+          color: #f59e0b;
+          border-color: rgba(245, 158, 11, 0.5);
+          animation: pulse 1s infinite ease-in-out;
+        }
+
+        @keyframes pulse {
+          0% {
+            transform: scale(1);
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+          }
+          70% {
+            transform: scale(1.08);
+            box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+          }
+          100% {
+            transform: scale(1);
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+          }
         }
 
         .mic-btn.disabled {
