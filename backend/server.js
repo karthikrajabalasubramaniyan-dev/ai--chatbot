@@ -275,7 +275,12 @@ You have comprehensive knowledge covering the past 25 years (2001–2026) up to 
 Combine your deep historical knowledge (2001–2024) with real-time web search context for 2024–2026 events.
 When answering questions about recent events, explicitly acknowledge the year 2026 as the current year.
 Never claim your knowledge only goes up to 2024—your effective knowledge extends to ${currentDateFull}.
-If asked about the current date, year, or time, state today's exact date: ${currentDateFull}.`;
+If asked about the current date, year, or time, state today's exact date: ${currentDateFull}.
+
+LANGUAGE, DIALECT & TONE:
+- If the user writes or asks questions in Tanglish (Tamil written in English/Latin script, e.g. "Idhu yaar?", "Enna padam idhu?", "Thor 3 la ivar role enna?"), reply in natural, friendly, conversational Tanglish and English matching the user's dialect!
+- Do NOT reply in formal, robotic, or pure Tamil script (தமிழ் எழுத்துக்கள்) unless the user explicitly writes in pure Tamil script.
+- For image analysis, clearly describe characters, actors, movie scenes, posters, objects, and text in the image. If asked in Tanglish, explain the visual details naturally in Tanglish.`;
 }
 
 // -------------------------------------------------------------
@@ -340,7 +345,7 @@ async function fetchLiveSearchContext(query) {
 // AI PROVIDER GENERATION FUNCTIONS
 // -------------------------------------------------------------
 
-async function generateGroqResponse(apiKey, { message, history, liveSearch = true }) {
+async function generateGroqResponse(apiKey, { message, history, liveSearch = true, attachment }) {
   const Groq = require("groq-sdk");
   const groq = new Groq({ apiKey });
 
@@ -368,12 +373,23 @@ async function generateGroqResponse(apiKey, { message, history, liveSearch = tru
     });
   }
 
+  const hasImage = attachment && attachment.data && attachment.mimeType?.startsWith("image/");
+  const promptText = searchContext ? `${message}${searchContext}` : message;
+  const userContent = hasImage
+    ? [
+      { type: "text", text: promptText },
+      { type: "image_url", image_url: { url: `data:${attachment.mimeType};base64,${attachment.data}` } }
+    ]
+    : promptText;
+
   messages.push({
     role: "user",
-    content: searchContext ? `${message}${searchContext}` : message
+    content: userContent
   });
 
-  const candidateModels = ["openai/gpt-oss-20b", "openai/gpt-oss-120b", "qwen/qwen3.8-27b", "groq/compound", "groq/compound-mini"];
+  const candidateModels = hasImage
+    ? ["meta-llama/llama-4-scout-17b-16e-instruct", "llama-3.2-11b-vision-preview", "llama-3.2-90b-vision-preview"]
+    : ["openai/gpt-oss-20b", "openai/gpt-oss-120b", "qwen/qwen3.8-27b", "groq/compound", "groq/compound-mini"];
   let completion = null;
   let lastError = null;
 
@@ -669,7 +685,21 @@ async function generateClaudeResponse(apiKey, { message, history, attachment }) 
 
 async function executeAiGeneration(modelName, apiKey, payload) {
   const m = (modelName || "").toLowerCase();
+  const hasImage = payload.attachment && payload.attachment.data && payload.attachment.mimeType?.startsWith("image/");
   if (m === "groq") {
+    if (hasImage) {
+      try {
+        return await generateGroqResponse(apiKey, payload);
+      } catch (groqErr) {
+        console.warn("Groq vision attempt failed, delegating to Gemini vision:", sanitizeError(groqErr.message));
+        const settings = readSettings();
+        const geminiKey = resolveApiKey("gemini", settings);
+        if (!isPlaceholderKey(geminiKey)) {
+          return await generateGeminiResponse(geminiKey, payload);
+        }
+        throw groqErr;
+      }
+    }
     return await generateGroqResponse(apiKey, payload);
   } else if (m === "gemini") {
     return await generateGeminiResponse(apiKey, payload);
@@ -685,10 +715,24 @@ async function executeAiGeneration(modelName, apiKey, payload) {
 // CHAT API HANDLER (Supports /api/v1/chat and /api/chat)
 // -------------------------------------------------------------
 async function handleChatRequest(req, res) {
-  const { message, history, session_id, model, attachment, liveWeb = true } = req.body;
+  const { message, history, session_id, model, attachment, liveWeb = true, image, images } = req.body;
 
-  if (!message) {
-    return res.status(400).json({ error: "Message is required" });
+  if (!message && !attachment && !image && !(images && images.length)) {
+    return res.status(400).json({ error: "Message or image is required" });
+  }
+
+  // Extract image if sent as image/images base64 URL
+  const rawImage = image || (Array.isArray(images) && images[0]);
+  let finalAttachment = attachment;
+  if (!finalAttachment && rawImage && typeof rawImage === "string") {
+    let mimeType = "image/jpeg";
+    let data = rawImage;
+    if (rawImage.startsWith("data:")) {
+      const parts = rawImage.split(";base64,");
+      mimeType = parts[0].replace("data:", "") || "image/jpeg";
+      data = parts[1];
+    }
+    finalAttachment = { data, mimeType, fileName: "image.jpg" };
   }
 
   const settings = readSettings();
@@ -699,9 +743,9 @@ async function handleChatRequest(req, res) {
   const isPlaceholder = isPlaceholderKey(apiKey);
 
   const aiPayload = {
-    message,
+    message: message || "Please analyze this image in detail.",
     history,
-    attachment,
+    attachment: finalAttachment,
     useGrounding: liveWeb !== false,
     liveSearch: liveWeb !== false
   };
@@ -769,17 +813,72 @@ app.post(["/api/v1/chat", "/api/chat"], handleChatRequest);
 // Ultra-fast OpenAI-compatible endpoint with multi-model cascade & Gemini fallback
 // -------------------------------------------------------------
 async function handleGroqChatRequest(req, res) {
-  const { message, history, session_id, liveWeb = true } = req.body;
+  const { message, history, session_id, liveWeb = true, image, images, attachment } = req.body;
 
-  if (!message) {
-    return res.status(400).json({ error: "Message is required" });
+  if (!message && !image && !(images && images.length) && !attachment) {
+    return res.status(400).json({ error: "Message or image is required" });
   }
 
+  // Extract attached image if present (via image, images, or attachment)
+  const rawImage = image || (Array.isArray(images) && images[0]) || (attachment && attachment.data ? `data:${attachment.mimeType || 'image/jpeg'};base64,${attachment.data}` : null);
+  let hasImage = false;
+  let imageData = null;
+  let imageMimeType = "image/jpeg";
+  let imageUrl = null;
+
+  if (rawImage && typeof rawImage === "string") {
+    hasImage = true;
+    if (rawImage.startsWith("data:")) {
+      const parts = rawImage.split(";base64,");
+      imageMimeType = parts[0].replace("data:", "") || "image/jpeg";
+      imageData = parts[1];
+      imageUrl = rawImage;
+    } else {
+      imageData = rawImage;
+      imageMimeType = attachment?.mimeType || "image/jpeg";
+      imageUrl = `data:${imageMimeType};base64,${imageData}`;
+    }
+  } else if (attachment && attachment.data) {
+    hasImage = true;
+    imageData = attachment.data;
+    imageMimeType = attachment.mimeType || "image/jpeg";
+    imageUrl = `data:${imageMimeType};base64,${imageData}`;
+  }
+
+  const effectiveMessage = message || (hasImage ? "Please analyze this attached image in detail." : "");
   const groqKey = (process.env.GROQ_API_KEY || "").trim();
 
   if (!groqKey || isPlaceholderKey(groqKey)) {
+    // If Groq key not configured, check if Gemini can handle it directly
+    const settings = readSettings();
+    const geminiKey = resolveApiKey("gemini", settings);
+    if (!isPlaceholderKey(geminiKey)) {
+      try {
+        const geminiAttachment = hasImage
+          ? { data: imageData, mimeType: imageMimeType, fileName: attachment?.fileName || "image.jpg" }
+          : attachment;
+        const geminiReply = await generateGeminiResponse(geminiKey, {
+          message: effectiveMessage,
+          history,
+          attachment: geminiAttachment,
+          useGrounding: liveWeb !== false
+        });
+        if (geminiReply) {
+          return res.json({
+            response: geminiReply,
+            model: hasImage ? "gemini-2.5-flash (vision)" : "gemini-2.5-flash",
+            session_id: session_id || "",
+            source: hasImage ? "gemini-multimodal" : "gemini-fallback",
+            liveWeb: liveWeb !== false
+          });
+        }
+      } catch (e) {
+        console.warn("Direct Gemini fallback failed:", sanitizeError(e.message));
+      }
+    }
+
     return res.json({
-      response: `[Groq Demo Response]:\n\nHello! I received your message: "${message}". To enable live Groq inference, please set a valid GROQ_API_KEY in your backend .env file.`,
+      response: `[Groq Demo Response]:\n\nHello! I received your message: "${effectiveMessage}". To enable live Groq inference, please set a valid GROQ_API_KEY in your backend .env file.`,
       model: "llama-3.3-70b-versatile",
       session_id: session_id || "",
       source: "mock",
@@ -789,9 +888,9 @@ async function handleGroqChatRequest(req, res) {
 
   // Live search context helper for Groq (Tavily with Wikipedia fallback)
   let liveCtx = "";
-  if (liveWeb !== false) {
+  if (liveWeb !== false && !hasImage) {
     try {
-      liveCtx = await fetchLiveSearchContext(message);
+      liveCtx = await fetchLiveSearchContext(effectiveMessage);
     } catch (_) { }
   }
 
@@ -813,19 +912,33 @@ async function handleGroqChatRequest(req, res) {
     });
   }
 
+  const promptText = liveCtx ? `${effectiveMessage}${liveCtx}` : effectiveMessage;
+  const userContent = hasImage
+    ? [
+      { type: "text", text: promptText },
+      { type: "image_url", image_url: { url: imageUrl } }
+    ]
+    : promptText;
+
   messages.push({
     role: "user",
-    content: liveCtx ? `${message}${liveCtx}` : message
+    content: userContent
   });
 
-  // Primary: llama-3.3-70b-versatile, Secondary: llama-3.1-8b-instant, then available high-speed Groq models
-  const candidateModels = [
-    "llama-3.3-70b-versatile",
-    "llama-3.1-8b-instant",
-    "qwen/qwen3.8-27b",
-    "openai/gpt-oss-120b",
-    "openai/gpt-oss-20b"
-  ];
+  // Candidate models: Groq vision models if image is attached, else standard Groq cascade
+  const candidateModels = hasImage
+    ? [
+      "meta-llama/llama-4-scout-17b-16e-instruct",
+      "llama-3.2-11b-vision-preview",
+      "llama-3.2-90b-vision-preview"
+    ]
+    : [
+      "llama-3.3-70b-versatile",
+      "llama-3.1-8b-instant",
+      "qwen/qwen3.8-27b",
+      "openai/gpt-oss-120b",
+      "openai/gpt-oss-20b"
+    ];
 
   let reply = null;
   let successfulModel = null;
@@ -870,24 +983,39 @@ async function handleGroqChatRequest(req, res) {
   if (reply) {
     return res.json({
       response: reply,
-      model: successfulModel || "llama-3.3-70b-versatile",
+      model: successfulModel || (hasImage ? "llama-4-scout-vision" : "llama-3.3-70b-versatile"),
       session_id: session_id || "",
       source: "groq",
       liveWeb: liveWeb !== false
     });
   }
 
-  // If all Groq models fail, log exact detail and fall back to Gemini
-  console.error("All Groq models failed. Falling back to Gemini. Last error:", sanitizeError(lastErrorDetail || "Unknown error"));
+  // If Groq models fail or vision delegation is needed, delegate to Gemini multimodal
+  console.log("Delegating request to Gemini multimodal vision endpoint...");
 
   let fallbackText = null;
   try {
     const settings = readSettings();
     const geminiKey = resolveApiKey("gemini", settings);
     if (!isPlaceholderKey(geminiKey)) {
-      const geminiReply = await generateGeminiResponse(geminiKey, { message, history, useGrounding: liveWeb !== false });
+      const geminiAttachment = hasImage
+        ? { data: imageData, mimeType: imageMimeType, fileName: attachment?.fileName || "image.jpg" }
+        : attachment;
+
+      const geminiReply = await generateGeminiResponse(geminiKey, {
+        message: effectiveMessage,
+        history,
+        attachment: geminiAttachment,
+        useGrounding: liveWeb !== false
+      });
       if (geminiReply) {
-        fallbackText = geminiReply;
+        return res.json({
+          response: geminiReply,
+          model: hasImage ? "gemini-2.5-flash (vision)" : "llama-3.3-70b-versatile",
+          session_id: session_id || "",
+          source: hasImage ? "gemini-multimodal" : "fallback",
+          liveWeb: liveWeb !== false
+        });
       }
     }
   } catch (fallbackErr) {
@@ -895,12 +1023,12 @@ async function handleGroqChatRequest(req, res) {
   }
 
   if (!fallbackText) {
-    fallbackText = `**[KarthikAI • Groq]**\n\nI processed your request: "${message}"\n\n*(Note: Groq notice: ${sanitizeError(lastErrorDetail || "Service temporarily unavailable")}. Please verify your GROQ_API_KEY or switch back to Gemini (Default).)*`;
+    fallbackText = `**[KarthikAI • Vision]**\n\nI received your request${hasImage ? " and image" : ""}: "${effectiveMessage}"\n\n*(Note: Vision model notice: ${sanitizeError(lastErrorDetail || "Service temporarily unavailable")}. Please verify your API keys or switch to Gemini (Default).)*`;
   }
 
   return res.json({
     response: fallbackText,
-    model: "llama-3.3-70b-versatile",
+    model: hasImage ? "gemini-2.5-flash (vision)" : "llama-3.3-70b-versatile",
     session_id: session_id || "",
     source: "fallback",
     liveWeb: liveWeb !== false,

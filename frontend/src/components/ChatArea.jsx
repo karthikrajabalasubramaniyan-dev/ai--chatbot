@@ -274,7 +274,8 @@ export default function ChatArea({
       setIsParsing(false);
       const reader = new FileReader();
       reader.onload = (e) => {
-        const base64 = e.target.result.split(",")[1];
+        const fullDataUrl = e.target.result;
+        const base64 = fullDataUrl.includes(",") ? fullDataUrl.split(",")[1] : fullDataUrl;
         setBase64Data(base64);
       };
       reader.readAsDataURL(file);
@@ -319,14 +320,40 @@ export default function ChatArea({
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if ((!input.trim() && !selectedFile) || isLoading || isParsing) return;
 
+    let rawData = base64Data;
+    // Safety check: ensure file base64 data is resolved if file is selected
+    if (selectedFile && !rawData) {
+      try {
+        rawData = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const res = e.target.result;
+            resolve(res.includes(",") ? res.split(",")[1] : res);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(selectedFile);
+        });
+        setBase64Data(rawData);
+      } catch (err) {
+        console.warn("Could not read attachment file:", err);
+      }
+    }
+
+    const isImage = selectedFile && selectedFile.type?.startsWith("image/");
+    const fullDataUrl = isImage && rawData
+      ? (rawData.startsWith("data:") ? rawData : `data:${selectedFile.type};base64,${rawData}`)
+      : null;
+
     const attachment = selectedFile ? {
-      data: base64Data,
-      mimeType: selectedFile.type.startsWith("image/") ? selectedFile.type : "application/pdf",
+      data: rawData,
+      mimeType: isImage ? selectedFile.type : "application/pdf",
       extractedText: extractedText,
-      fileName: selectedFile.name
+      fileName: selectedFile.name,
+      image: fullDataUrl,
+      images: fullDataUrl ? [fullDataUrl] : []
     } : null;
 
     if (appMode === "study") {

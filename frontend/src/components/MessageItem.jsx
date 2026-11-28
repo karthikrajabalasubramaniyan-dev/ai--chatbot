@@ -188,7 +188,14 @@ export default function MessageItem({ message }) {
       <div className="bubble-container">
         <div className={`message-bubble ${isUser ? "user-bubble" : "ai-bubble glass-panel"}`}>
           {isUser ? (
-            <div className="message-text user-text">{message.content}</div>
+            <div className="message-text user-text">
+              {message.image && (
+                <div className="user-message-image-container">
+                  <img src={message.image} alt={message.imageName || "Attached image"} className="user-attached-image" />
+                </div>
+              )}
+              {message.content && <div>{message.content}</div>}
+            </div>
           ) : (
             <div className="markdown-content">
               <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
@@ -330,6 +337,23 @@ export default function MessageItem({ message }) {
           font-size: 0.95rem;
           line-height: 1.5;
           word-break: break-word;
+        }
+
+        .user-message-image-container {
+          margin-bottom: 8px;
+          border-radius: 10px;
+          overflow: hidden;
+          max-width: 280px;
+          border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .user-attached-image {
+          width: 100%;
+          height: auto;
+          display: block;
+          object-fit: cover;
+          max-height: 240px;
+          border-radius: 8px;
         }
         
         .timestamp {

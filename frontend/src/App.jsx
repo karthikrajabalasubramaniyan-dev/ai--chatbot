@@ -178,9 +178,13 @@ export default function App() {
     if (!text.trim()) return;
 
     const isImage = attachment && attachment.mimeType?.startsWith("image/");
+    const imageBase64Url = isImage
+      ? (attachment.image || (attachment.data ? `data:${attachment.mimeType};base64,${attachment.data}` : null))
+      : null;
+
     const userContent = attachment
       ? isImage
-        ? `🖼️ **Image**: ${attachment.fileName}\n\n${text}`
+        ? (text ? text : `[Analyzing Image: ${attachment.fileName}]`)
         : `📎 **Document**: ${attachment.fileName}\n\n${text}`
       : text;
 
@@ -188,6 +192,8 @@ export default function App() {
       id: Date.now().toString(),
       role: "user",
       content: userContent,
+      image: isImage ? imageBase64Url : null,
+      imageName: isImage ? attachment.fileName : null,
       timestamp: new Date().toISOString()
     };
 
@@ -250,13 +256,15 @@ export default function App() {
         if (isImage) {
           payloadAttachment = {
             data: attachment.data,
-            mimeType: attachment.mimeType
+            mimeType: attachment.mimeType,
+            fileName: attachment.fileName
           };
         } else {
           if (effectiveModel === "gemini") {
             payloadAttachment = {
               data: attachment.data,
-              mimeType: attachment.mimeType
+              mimeType: attachment.mimeType,
+              fileName: attachment.fileName
             };
           } else {
             promptMessage = `[Document Context: ${attachment.fileName}]\n---\nDOCUMENT TEXT:\n${attachment.extractedText || "No text extracted."}\n---\nUser Question:\n${text}`;
@@ -264,22 +272,16 @@ export default function App() {
         }
       }
 
-      const requestPayload = isGroq
-        ? {
-          message: promptMessage,
-          history: apiHistory,
-          session_id: targetConvId,
-          model: "llama-3.3-70b-versatile",
-          liveWeb: liveWeb !== false
-        }
-        : {
-          message: promptMessage,
-          history: apiHistory,
-          session_id: targetConvId,
-          model: effectiveModel,
-          attachment: payloadAttachment,
-          liveWeb: liveWeb !== false
-        };
+      const requestPayload = {
+        message: promptMessage,
+        history: apiHistory,
+        session_id: targetConvId,
+        model: isGroq ? "llama-3.3-70b-versatile" : effectiveModel,
+        attachment: payloadAttachment,
+        image: isImage ? imageBase64Url : null,
+        images: isImage && imageBase64Url ? [imageBase64Url] : [],
+        liveWeb: liveWeb !== false
+      };
 
       const response = await fetch(targetEndpoint, {
         method: "POST",
