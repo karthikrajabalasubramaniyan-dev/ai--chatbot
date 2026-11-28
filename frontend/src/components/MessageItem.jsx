@@ -317,30 +317,28 @@ export default function MessageItem({ message }) {
           overflow-wrap: anywhere;
         }
         .user-bubble {
-          background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-          color: #ffffff;
+          background: #1c1c21;
+          color: #fafafa;
           border-radius: 18px 18px 4px 18px;
-          box-shadow: 0 4px 16px rgba(79, 70, 229, 0.25);
-          border: 1px solid rgba(255, 255, 255, 0.1);
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+          border: 1px solid #2e2e34;
         }
         body.light-mode .user-bubble {
-          background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-          color: #ffffff;
-          box-shadow: 0 4px 14px rgba(99, 102, 241, 0.2);
-          border: 1px solid rgba(255, 255, 255, 0.2);
+          background: #f1f5f9;
+          color: #0f172a;
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+          border: 1px solid #e2e8f0;
         }
         .ai-bubble {
-          background: rgba(15, 23, 42, 0.65);
+          background: #131316;
           border-radius: 18px 18px 18px 4px;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          backdrop-filter: blur(16px);
-          -webkit-backdrop-filter: blur(16px);
-          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+          border: 1px solid #27272a;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
           width: 100%;
         }
         body.light-mode .ai-bubble {
-          background: rgba(255, 255, 255, 0.85);
-          border: 1px solid rgba(15, 23, 42, 0.08);
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
           box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
         }
         
@@ -446,10 +444,8 @@ export default function MessageItem({ message }) {
           margin: 1rem 0;
           border-radius: 12px;
           border: 1px solid var(--border-color);
-          background: rgba(15, 23, 42, 0.55);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+          background: #18181c;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
           scrollbar-width: thin;
           scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
           box-sizing: border-box;

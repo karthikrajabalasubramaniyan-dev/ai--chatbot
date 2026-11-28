@@ -12,54 +12,62 @@ const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const CHAT_SUGGESTIONS = [
   {
-    icon: <Code size={16} className="suggest-icon code" />,
+    icon: <Code size={18} className="suggest-icon code" />,
     title: "Full-Stack Code",
-    text: "Write an accessible React component with Tailwind",
+    text: "Modern React & Tailwind Component",
+    desc: "Build an accessible, animated UI component with clean state management.",
     prompt: "Write a modern, accessible React component with Tailwind CSS styling and clean state management."
   },
   {
-    icon: <Sparkles size={16} className="suggest-icon sparkle" />,
+    icon: <Sparkles size={18} className="suggest-icon sparkle" />,
     title: "Deep Tech",
-    text: "Explain transformers & attention mechanisms simply",
+    text: "Explain Transformers & Attention",
+    desc: "Understand neural networks and multi-head attention with intuitive analogies.",
     prompt: "Explain how neural networks, transformers, and self-attention mechanisms work using intuitive real-world analogies."
   },
   {
-    icon: <GraduationCap size={16} className="suggest-icon table" />,
+    icon: <GraduationCap size={18} className="suggest-icon table" />,
     title: "Exam & Revision",
-    text: "OS Deadlock Avoidance & Banker's Algorithm",
+    text: "OS Banker's Deadlock Algorithm",
+    desc: "Step-by-step avoidance algorithm breakdown with clear ASCII state diagrams.",
     prompt: "Operating Systems: Explain Deadlock Prevention, Avoidance, and Banker's Algorithm with detailed ASCII diagram."
   },
   {
-    icon: <MessageSquare size={16} className="suggest-icon message" />,
+    icon: <MessageSquare size={18} className="suggest-icon message" />,
     title: "AI Innovation",
-    text: "Brainstorm 5 innovative generative AI applications",
+    text: "Brainstorm 5 Next-Gen AI Apps",
+    desc: "Practical generative AI architecture blueprints with monetization roadmaps.",
     prompt: "Give me 5 creative, practical ideas for generative AI applications with clear architecture and monetization strategies."
   }
 ];
 
 const STUDY_SUGGESTIONS = [
   {
-    icon: <FileText size={16} className="suggest-icon sparkle" />,
-    title: "Part-A Prep",
-    text: "Computer Networks: TCP vs UDP (2-Marks)",
+    icon: <FileText size={18} className="suggest-icon sparkle" />,
+    title: "Part-A (2-Marks)",
+    text: "CN: TCP vs UDP Differences",
+    desc: "High-scoring concise points with comparison table for quick exam recall.",
     prompt: "Computer Networks Unit 3: Differentiate between TCP and UDP protocols with comparison table."
   },
   {
-    icon: <BookOpen size={16} className="suggest-icon code" />,
-    title: "Part-B Prep",
-    text: "OS: Deadlock & Banker's Algorithm (16-Marks)",
+    icon: <BookOpen size={18} className="suggest-icon code" />,
+    title: "Part-B (16-Marks)",
+    text: "OS: Banker's Algorithm & Deadlock",
+    desc: "Structured university answer format with resource allocation matrix.",
     prompt: "Operating Systems: Explain Deadlock Prevention, Avoidance, and Banker's Algorithm with detailed diagram."
   },
   {
-    icon: <Layers size={16} className="suggest-icon table" />,
+    icon: <Layers size={18} className="suggest-icon table" />,
     title: "Quick Revision",
-    text: "DBMS: Normalization 1NF to BCNF (Revision)",
+    text: "DBMS: Normalization 1NF to BCNF",
+    desc: "Cheat sheet covering functional dependencies, candidate keys, and lossy checks.",
     prompt: "Database Management Systems: Quick revision cheat sheet on Functional Dependency, 1NF, 2NF, 3NF, and BCNF."
   },
   {
-    icon: <Zap size={16} className="suggest-icon message" />,
+    icon: <Zap size={18} className="suggest-icon message" />,
     title: "Tanglish Explain",
-    text: "Compiler Design: Lexical Analysis (Tanglish)",
+    text: "CD: Lexical Analysis Phase",
+    desc: "Lexemes, tokens, and pattern matching explained in friendly beginner Tanglish.",
     prompt: "Compiler Design: Explain Lexical Analysis phase, tokens, and lexemes in friendly beginner Tanglish."
   }
 ];
@@ -528,23 +536,20 @@ export default function ChatArea({
       <div className="message-stream-container">
         {messages.length === 0 ? (
           <div className="welcome-container animate-fade-in">
-            <div className="welcome-glow"></div>
-            <div className="welcome-logo">
-              {appMode === "study" ? (
-                <GraduationCap size={38} className="logo-ai" style={{ color: "#38bdf8" }} />
-              ) : (
-                <Bot size={36} className="logo-ai" />
-              )}
+            {/* Top Status Pill */}
+            <div className="bento-status-pill">
+              <span className="status-dot"></span>
+              <span>● {inputModel === "groq" ? "Groq Llama 3.3 70B" : "Gemini 2.5 Flash"} • 2001–2026 Live Grounding</span>
             </div>
 
             <h1 className="welcome-title">
-              {appMode === "study" ? "Anna University CSE Exam Prep" : "KarthikAI Intelligence"}
+              {appMode === "study" ? "Anna University CSE Exam Prep" : "What would you like to explore today?"}
             </h1>
 
             <p className="welcome-subtitle">
               {appMode === "study"
                 ? "Tailored revision notes, 10 Part-A Q&As, 16-Mark structured answers with diagrams, cheat sheets, and simple Tanglish explanations."
-                : "Your next-generation AI assistant for coding, writing, research, and analysis."
+                : "Supercharged by Groq & Gemini with 25-year knowledge grounding, voice intelligence, and multimodal vision."
               }
             </p>
 
@@ -552,14 +557,17 @@ export default function ChatArea({
               {(appMode === "study" ? STUDY_SUGGESTIONS : CHAT_SUGGESTIONS).map((sug, idx) => (
                 <div
                   key={idx}
-                  className="suggestion-card glass-panel"
+                  className="suggestion-card"
                   onClick={() => handleSuggestionClick(sug.prompt)}
                 >
-                  <div className="suggestion-header">
-                    {sug.icon}
+                  <div className="suggestion-card-top">
+                    <div className="suggestion-icon-wrap">
+                      {sug.icon}
+                    </div>
                     {sug.title && <span className="suggestion-title-tag">{sug.title}</span>}
                   </div>
-                  <p className="suggestion-text">{sug.text}</p>
+                  <h3 className="suggestion-title">{sug.text}</h3>
+                  <p className="suggestion-desc">{sug.desc || sug.text}</p>
                 </div>
               ))}
             </div>
@@ -622,41 +630,8 @@ export default function ChatArea({
           </div>
         )}
 
-        {/* Compact Model Selector Bar near chat input */}
-        <div className="input-toolbar-row animate-fade-in">
-          <div className="input-model-selector-wrapper">
-            <Bot size={13} className="input-model-icon" />
-            <span className="input-model-tag">Model:</span>
-            <select
-              value={inputModel}
-              onChange={(e) => {
-                const val = e.target.value;
-                setInputModel(val);
-                onChangeModel?.(val);
-              }}
-              className="input-model-dropdown"
-              title="Select Chat Model"
-              disabled={isLoading}
-              aria-label="Select Chat Model"
-            >
-              <option value="gemini">Gemini (Default)</option>
-              <option value="groq">Groq (Llama 3.3 70B)</option>
-            </select>
-          </div>
-
-          <button
-            type="button"
-            className={`live-web-toggle-pill ${liveWebEnabled ? "active" : ""}`}
-            onClick={() => setLiveWebEnabled(prev => !prev)}
-            title={liveWebEnabled ? "Live Web & Grounding Active (2001–2026)" : "Live Web Search Disabled"}
-          >
-            <Globe size={12} className="live-web-icon" />
-            <span>Live Web (2001–2026)</span>
-            <span className={`live-web-dot ${liveWebEnabled ? "on" : "off"}`}></span>
-          </button>
-        </div>
-
-        <div className={`input-box-wrapper glass-panel ${appMode === "study" ? "study-input-active" : ""}`}>
+        {/* Unified Command-Palette Input Dock */}
+        <div className={`command-palette-card ${appMode === "study" ? "study-input-active" : ""}`}>
           <input
             type="file"
             ref={fileInputRef}
@@ -668,19 +643,9 @@ export default function ChatArea({
             style={{ display: "none" }}
           />
 
-          <button
-            type="button"
-            className={`paperclip-btn ${selectedFile ? "has-file" : ""}`}
-            onClick={() => fileInputRef.current?.click()}
-            title={appMode === "study" ? "Upload syllabus or lecture notes PDF" : "Upload PDF or image"}
-            disabled={isLoading || isParsing || voiceStatus === "listening"}
-          >
-            <Paperclip size={18} />
-          </button>
-
           <textarea
             ref={textareaRef}
-            rows={1}
+            rows={2}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -692,53 +657,105 @@ export default function ChatArea({
                   : voiceStatus === "processing"
                     ? "Transcribing voice input..."
                     : appMode === "study"
-                      ? `Enter topic or unit (e.g. 'Operating Systems - Deadlocks') for ${studyMode === "2-marks" ? "2-Mark Q&A" : studyMode === "16-marks" ? "16-Mark Answers" : studyMode === "unit-summary" ? "Quick Revision" : "Tanglish Explanation"}...`
-                      : "Ask KarthikAI anything..."
+                      ? `Enter topic (e.g. 'Operating Systems - Deadlocks') for ${studyMode === "2-marks" ? "2-Mark Q&A" : studyMode === "16-marks" ? "16-Mark Answers" : studyMode === "unit-summary" ? "Quick Revision" : "Tanglish Explanation"}...`
+                      : "Ask KarthikAI anything (2001–2026 Live Knowledge)..."
             }
-            className={`chat-textarea ${voiceStatus === "listening" ? "textarea-listening" : ""} ${voiceStatus === "processing" ? "textarea-processing" : ""}`}
+            className={`command-textarea ${voiceStatus === "listening" ? "textarea-listening" : ""} ${voiceStatus === "processing" ? "textarea-processing" : ""}`}
             disabled={isLoading || voiceStatus === "processing" || isParsing}
           />
 
-          {/* Language Toggle */}
-          <button
-            type="button"
-            className={`lang-toggle-btn ${voiceLanguage === "ta-IN" ? "tamil" : ""}`}
-            onClick={() => setVoiceLanguage(prev => prev === "en-US" ? "ta-IN" : "en-US")}
-            title={`Voice Language: ${voiceLanguage === "en-US" ? "English" : "Tamil (தமிழ்)"}`}
-            disabled={voiceStatus !== "idle"}
-          >
-            <Globe size={14} />
-            <span>{voiceLanguage === "en-US" ? "EN" : "தமிழ்"}</span>
-          </button>
+          {/* Clean Bottom Action Bar */}
+          <div className="command-action-bar">
+            <div className="command-actions-left">
+              {/* Model Selector Pill */}
+              <div className="command-pill-model">
+                <Bot size={13} className="command-pill-icon" />
+                <select
+                  value={inputModel}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setInputModel(val);
+                    onChangeModel?.(val);
+                  }}
+                  className="command-model-select"
+                  title="Select AI Model"
+                  disabled={isLoading}
+                  aria-label="Select AI Model"
+                >
+                  <option value="groq">Groq 70B</option>
+                  <option value="gemini">Gemini</option>
+                </select>
+              </div>
 
-          {/* Microphone Button */}
-          <button
-            type="button"
-            className={`mic-btn ${voiceStatus === "listening" ? "listening" : ""} ${voiceStatus === "processing" ? "processing" : ""} ${!isVoiceInputSupported ? "disabled" : ""}`}
-            onClick={toggleListening}
-            title={
-              !isVoiceInputSupported
-                ? (voiceError || "Audio input is not supported")
-                : voiceStatus === "listening"
-                  ? "Stop listening & transcribe"
-                  : voiceStatus === "processing"
-                    ? "Processing transcription..."
-                    : "Start voice input"
-            }
-            disabled={!isVoiceInputSupported || voiceStatus === "processing"}
-          >
-            {voiceStatus === "listening" ? <MicOff size={16} /> : <Mic size={16} />}
-          </button>
+              {/* Live Web Toggle Pill */}
+              <button
+                type="button"
+                className={`command-pill-btn live-web-pill ${liveWebEnabled ? "active" : ""}`}
+                onClick={() => setLiveWebEnabled(prev => !prev)}
+                title={liveWebEnabled ? "Live Web & Grounding Active (2001–2026)" : "Live Web Search Disabled"}
+              >
+                <Globe size={13} className="command-pill-icon" />
+                <span>Live Web</span>
+                <span className={`live-web-dot ${liveWebEnabled ? "on" : "off"}`}></span>
+              </button>
 
-          <button
-            className={`send-btn ${input.trim() || selectedFile ? "active" : ""} ${appMode === "study" ? "study-send-btn" : ""}`}
-            onClick={handleSend}
-            disabled={(!input.trim() && !selectedFile) || isLoading || voiceStatus === "processing" || isParsing}
-            title={appMode === "study" ? "Generate Exam Material" : "Send message"}
-          >
-            {appMode === "study" ? <GraduationCap size={18} /> : <Send size={18} />}
-          </button>
+              {/* Attach File Button */}
+              <button
+                type="button"
+                className={`command-pill-btn attach-pill ${selectedFile ? "has-file" : ""}`}
+                onClick={() => fileInputRef.current?.click()}
+                title={appMode === "study" ? "Upload syllabus or lecture notes PDF" : "Upload PDF or image"}
+                disabled={isLoading || isParsing || voiceStatus === "listening"}
+              >
+                <Paperclip size={13} />
+                <span>{selectedFile ? (selectedFile.name.length > 10 ? selectedFile.name.slice(0, 8) + "..." : selectedFile.name) : "Attach"}</span>
+              </button>
+            </div>
+
+            <div className="command-actions-right">
+              {/* Language Toggle */}
+              <button
+                type="button"
+                className={`command-pill-btn lang-pill ${voiceLanguage === "ta-IN" ? "tamil" : ""}`}
+                onClick={() => setVoiceLanguage(prev => prev === "en-US" ? "ta-IN" : "en-US")}
+                title={`Voice Language: ${voiceLanguage === "en-US" ? "English" : "Tamil (தமிழ்)"}`}
+                disabled={voiceStatus !== "idle"}
+              >
+                <span>{voiceLanguage === "en-US" ? "EN" : "தமிழ்"}</span>
+              </button>
+
+              {/* Microphone Button */}
+              <button
+                type="button"
+                className={`command-icon-btn mic-btn ${voiceStatus === "listening" ? "listening" : ""} ${voiceStatus === "processing" ? "processing" : ""} ${!isVoiceInputSupported ? "disabled" : ""}`}
+                onClick={toggleListening}
+                title={
+                  !isVoiceInputSupported
+                    ? (voiceError || "Audio input is not supported")
+                    : voiceStatus === "listening"
+                      ? "Stop listening & transcribe"
+                      : voiceStatus === "processing"
+                        ? "Processing transcription..."
+                        : "Start voice input"
+                }
+                disabled={!isVoiceInputSupported || voiceStatus === "processing"}
+              >
+                {voiceStatus === "listening" ? <MicOff size={15} /> : <Mic size={15} />}
+              </button>
+
+              {/* Emerald Circular Send Button */}
+              <button
+                className={`command-send-btn ${input.trim() || selectedFile ? "active" : ""} ${appMode === "study" ? "study-send" : ""}`}
+                onClick={handleSend}
+                disabled={(!input.trim() && !selectedFile) || isLoading || voiceStatus === "processing" || isParsing}
+                title={appMode === "study" ? "Generate Exam Material" : "Send message"}
+              >
+                {appMode === "study" ? <GraduationCap size={16} /> : <Send size={15} />}
+              </button>
+            </div>
+          </div>
         </div>
+
         {voiceError ? (
           <p className="input-disclaimer voice-error-text">
             ⚠️ {voiceError}
@@ -747,7 +764,7 @@ export default function ChatArea({
           <p className="input-disclaimer">
             {appMode === "study"
               ? "Anna University CSE Exam Specialist • Covers 2-Marks, 16-Marks with diagrams, Revision Cheat Sheets & Tanglish explanations."
-              : "KarthikAI can assist with coding, general queries, and document analysis."
+              : "KarthikAI Obsidian & Emerald Bento • 2001–2026 Grounded Intelligence"
             }
           </p>
         )}
@@ -764,7 +781,7 @@ export default function ChatArea({
           min-width: 0;
           height: 100%;
           position: relative;
-          background: radial-gradient(circle at 50% 50%, var(--bg-app) 0%, rgba(8, 11, 17, 0.95) 100%);
+          background: var(--bg-app);
           overflow: hidden;
           box-sizing: border-box;
         }
@@ -777,7 +794,7 @@ export default function ChatArea({
           justify-content: space-between;
           padding: 0 1.5rem;
           border-bottom: 1px solid var(--border-color);
-          background-color: rgba(8, 11, 17, 0.4);
+          background-color: var(--bg-app);
           z-index: 10;
           width: 100%;
           max-width: 100%;
@@ -1090,128 +1107,6 @@ export default function ChatArea({
           -webkit-overflow-scrolling: touch;
         }
 
-        .welcome-container {
-          margin: auto;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          text-align: center;
-          max-width: 640px;
-          position: relative;
-          z-index: 1;
-          padding: 0 1rem;
-          width: 100%;
-          box-sizing: border-box;
-        }
-
-        .welcome-glow {
-          position: absolute;
-          width: 320px;
-          height: 320px;
-          background: radial-gradient(circle, rgba(139, 92, 246, 0.3) 0%, rgba(59, 130, 246, 0.12) 45%, transparent 70%);
-          top: -40px;
-          z-index: -1;
-          pointer-events: none;
-          filter: blur(25px);
-        }
-
-        .welcome-logo {
-          width: 68px;
-          height: 68px;
-          border-radius: 22px;
-          background: linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(59, 130, 246, 0.25));
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin-bottom: 1.25rem;
-          box-shadow: 0 12px 36px rgba(139, 92, 246, 0.25);
-          backdrop-filter: blur(12px);
-        }
-
-        .logo-ai {
-          color: var(--primary);
-        }
-
-        .welcome-title {
-          font-family: var(--font-display);
-          font-size: 2.3rem;
-          font-weight: 700;
-          letter-spacing: -0.03em;
-          margin-bottom: 0.6rem;
-          background: linear-gradient(135deg, #ffffff 0%, #e0e7ff 45%, #c084fc 80%, #a855f7 100%);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-        }
-
-        .welcome-subtitle {
-          color: var(--text-muted);
-          font-size: 1rem;
-          line-height: 1.6;
-          margin-bottom: 2.25rem;
-          max-width: 500px;
-        }
-
-        .suggestions-grid {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 12px;
-          width: 100%;
-          box-sizing: border-box;
-        }
-        @media (max-width: 640px) {
-          .suggestions-grid {
-            grid-template-columns: 1fr;
-          }
-        }
-
-        .suggestion-card {
-          padding: 1.1rem;
-          border-radius: 16px;
-          cursor: pointer;
-          transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          text-align: left;
-          background: rgba(15, 23, 42, 0.55);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          backdrop-filter: blur(14px);
-        }
-        .suggestion-card:hover {
-          background: rgba(30, 41, 59, 0.75);
-          border-color: rgba(139, 92, 246, 0.5);
-          transform: translateY(-2px);
-          box-shadow: 0 8px 24px -4px rgba(139, 92, 246, 0.2);
-        }
-
-        .suggestion-header {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          color: var(--text-muted);
-        }
-
-        .suggestion-title-tag {
-          font-size: 0.72rem;
-          font-weight: 600;
-          letter-spacing: 0.03em;
-          color: var(--text-muted);
-          text-transform: uppercase;
-        }
-
-        .suggest-icon.sparkle { color: #a855f7; }
-        .suggest-icon.code { color: #38bdf8; }
-        .suggest-icon.table { color: #34d399; }
-        .suggest-icon.message { color: #f472b6; }
-
-        .suggestion-text {
-          font-size: 0.88rem;
-          font-weight: 500;
-          color: var(--text-main);
-          line-height: 1.45;
-        }
-
         .message-list {
           width: 100%;
           max-width: 820px;
@@ -1236,112 +1131,6 @@ export default function ChatArea({
           display: flex;
           justify-content: center;
           margin-bottom: 2px;
-        }
-
-        .input-toolbar-row {
-          display: flex;
-          align-items: center;
-          justify-content: flex-start;
-          gap: 10px;
-          padding: 0 4px;
-          flex-wrap: wrap;
-        }
-
-        .live-web-toggle-pill {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 4px 11px;
-          border-radius: 20px;
-          background-color: var(--bg-surface);
-          border: 1px solid var(--border-color);
-          font-size: 0.78rem;
-          font-weight: 550;
-          color: var(--text-muted);
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-
-        .live-web-toggle-pill:hover {
-          border-color: #38bdf8;
-          color: var(--text-main);
-          background-color: var(--bg-surface-hover);
-        }
-
-        .live-web-toggle-pill.active {
-          color: #38bdf8;
-          background: rgba(56, 189, 248, 0.1);
-          border-color: rgba(56, 189, 248, 0.4);
-          box-shadow: 0 0 10px rgba(56, 189, 248, 0.15);
-        }
-
-        .live-web-icon {
-          color: #38bdf8;
-        }
-
-        .live-web-dot {
-          width: 6px;
-          height: 6px;
-          border-radius: 50%;
-          background-color: #64748b;
-          transition: background-color 0.2s ease;
-        }
-
-        .live-web-dot.on {
-          background-color: #10b981;
-          box-shadow: 0 0 6px #10b981;
-        }
-
-        .live-web-dot.off {
-          background-color: #ef4444;
-        }
-
-        .input-model-selector-wrapper {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 4px 10px;
-          border-radius: 20px;
-          background-color: var(--bg-surface);
-          border: 1px solid var(--border-color);
-          font-size: 0.78rem;
-          color: var(--text-muted);
-          transition: all 0.2s ease;
-        }
-
-        .input-model-selector-wrapper:hover {
-          border-color: var(--primary);
-          background-color: var(--bg-surface-hover);
-        }
-
-        .input-model-icon {
-          color: #8b5cf6;
-          flex-shrink: 0;
-        }
-
-        .input-model-tag {
-          font-weight: 600;
-          color: var(--text-muted);
-          font-size: 0.72rem;
-          text-transform: uppercase;
-          letter-spacing: 0.04em;
-        }
-
-        .input-model-dropdown {
-          background: transparent;
-          border: none;
-          outline: none;
-          color: var(--text-main);
-          font-size: 0.8rem;
-          font-weight: 500;
-          cursor: pointer;
-          padding: 2px 4px;
-          border-radius: 6px;
-        }
-
-        .input-model-dropdown option {
-          background-color: #0f172a;
-          color: #f8fafc;
         }
 
         .stop-speaking-btn {
@@ -1443,88 +1232,8 @@ export default function ChatArea({
           object-fit: cover;
         }
 
-        .input-box-wrapper {
-          display: flex;
-          align-items: flex-end;
-          gap: 8px;
-          padding: 10px 14px;
-          border-radius: 20px;
-          background: rgba(15, 23, 42, 0.7);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          backdrop-filter: blur(16px);
-          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
-          transition: all 0.25s ease;
-          width: 100%;
-          box-sizing: border-box;
-        }
-        .input-box-wrapper:focus-within {
-          border-color: rgba(139, 92, 246, 0.65);
-          box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15), 0 8px 24px rgba(0, 0, 0, 0.3);
-        }
-        
-        .paperclip-btn {
-          width: 36px;
-          height: 36px;
-          border-radius: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: var(--text-muted);
-          background-color: rgba(255, 255, 255, 0.02);
-          transition: all 0.2s ease;
-          flex-shrink: 0;
-        }
-        .paperclip-btn:hover {
-          color: var(--text-main);
-          background-color: rgba(255, 255, 255, 0.05);
-        }
-        .paperclip-btn.has-file {
-          color: #10b981;
-          border: 1px solid rgba(16, 185, 129, 0.3);
-        }
-
-        .chat-textarea {
-          flex-grow: 1;
-          background: transparent;
-          border: none;
-          outline: none;
-          color: var(--text-main);
-          font-family: var(--font-sans);
-          font-size: 0.95rem;
-          line-height: 1.5;
-          padding: 8px 4px;
-          resize: none;
-          max-height: 200px;
-          min-width: 0;
-        }
-        .chat-textarea::placeholder {
-          color: var(--text-muted);
-        }
-        
-        .send-btn {
-          width: 36px;
-          height: 36px;
-          border-radius: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: var(--text-muted);
-          background-color: rgba(255, 255, 255, 0.02);
-          transition: all 0.2s ease;
-          flex-shrink: 0;
-        }
-        .send-btn.active {
-          color: white;
-          background-color: var(--primary);
-          box-shadow: 0 4px 12px var(--primary-glow);
-        }
-        .send-btn.active:hover {
-          background-color: var(--primary-hover);
-          transform: scale(1.05);
-        }
-        
         .input-disclaimer {
-          font-size: 0.72rem;
+          font-size: 0.75rem;
           color: var(--text-muted);
           text-align: center;
           word-break: break-word;
@@ -1722,60 +1431,38 @@ export default function ChatArea({
             padding-bottom: 1rem;
           }
           .welcome-container {
-            margin: 0.75rem auto 0;
-            padding: 0 0.25rem;
-          }
-          .welcome-logo {
-            width: 52px;
-            height: 52px;
-            border-radius: 16px;
-            margin-bottom: 0.75rem;
+            padding: 1rem 0.25rem;
           }
           .welcome-title {
-            font-size: 1.3rem;
+            font-size: 22px;
           }
           .welcome-subtitle {
-            font-size: 0.8rem;
+            font-size: 0.85rem;
+            margin-bottom: 1.25rem;
+          }
+          .bento-status-pill {
+            font-size: 0.72rem;
+            padding: 4px 10px;
             margin-bottom: 1rem;
           }
-          .suggestion-card {
-            padding: 0.85rem;
-            border-radius: 12px;
+          .command-palette-card {
+            padding: 10px 10px 8px;
+            border-radius: 14px;
           }
-          .suggestion-text {
-            font-size: 0.8rem;
+          .command-textarea {
+            font-size: 0.88rem;
+          }
+          .command-pill-btn, .command-pill-model {
+            padding: 3px 6px;
+            font-size: 0.72rem;
+          }
+          .command-icon-btn, .command-send-btn {
+            width: 30px;
+            height: 30px;
           }
           .chat-input-container {
             padding: 0 0.5rem 0.5rem;
             gap: 4px;
-          }
-          .input-box-wrapper {
-            padding: 6px 8px;
-            gap: 6px;
-            border-radius: 16px;
-          }
-          .chat-textarea {
-            font-size: 0.88rem;
-            padding: 6px 2px;
-          }
-          .paperclip-btn, .mic-btn, .send-btn {
-            width: 32px;
-            height: 32px;
-            border-radius: 10px;
-          }
-          .paperclip-btn svg, .mic-btn svg, .send-btn svg {
-            width: 15px;
-            height: 15px;
-          }
-          .lang-toggle-btn {
-            height: 32px;
-            padding: 0 5px;
-            font-size: 0.68rem;
-            border-radius: 10px;
-          }
-          .lang-toggle-btn svg {
-            width: 12px;
-            height: 12px;
           }
           .input-disclaimer {
             font-size: 0.68rem;
