@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+Tamil:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
 
 :root {
   /* Default: Dark Theme variables */
@@ -28,8 +28,9 @@
 
   --glass-blur: 16px;
 
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-display: 'Outfit', sans-serif;
+  --font-sans: 'Inter', 'Noto Sans Tamil', system-ui, -apple-system, sans-serif;
+  --font-display: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
 }
 
 body.light-mode {
@@ -75,6 +76,9 @@ body,
   font-family: var(--font-sans);
   background-color: var(--bg-app);
   color: var(--text-main);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
@@ -114,10 +118,10 @@ button:focus-visible {
   box-shadow: var(--shadow-md);
 }
 
-/* Scrollbars styling */
+/* Custom Thin Dark Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -125,12 +129,30 @@ button:focus-visible {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border-color);
+  background: rgba(255, 255, 255, 0.12);
   border-radius: 9999px;
+  transition: background 0.2s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+  background: rgba(255, 255, 255, 0.28);
+}
+
+body.light-mode ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+body.light-mode ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
+body.light-mode * {
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
 }
 
 /* Typography elements */
@@ -192,21 +214,23 @@ h4 {
 
 /* Markdown styling inside AI response bubble */
 .markdown-content {
-  line-height: 1.6;
+  line-height: 1.65;
   font-size: 0.95rem;
   word-break: break-word;
   overflow-wrap: anywhere;
   max-width: 100%;
   min-width: 0;
+  letter-spacing: -0.01em;
 }
 
 .markdown-content img {
   max-width: 100%;
   height: auto;
+  border-radius: 8px;
 }
 
 .markdown-content p {
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.85rem;
 }
 
 .markdown-content p:last-child {
@@ -220,27 +244,29 @@ h4 {
 
 .markdown-content ul,
 .markdown-content ol {
-  margin-bottom: 0.75rem;
-  padding-left: 1.25rem;
+  margin-bottom: 0.85rem;
+  padding-left: 1.35rem;
   max-width: 100%;
 }
 
 .markdown-content li {
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.35rem;
 }
 
 .markdown-content code {
-  font-family: 'Courier New', Courier, monospace;
-  font-weight: 600;
-  padding: 0.125rem 0.25rem;
-  border-radius: 4px;
-  background-color: rgba(255, 255, 255, 0.1);
-  font-size: 0.85em;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  padding: 0.15rem 0.35rem;
+  border-radius: 6px;
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.86em;
   word-break: break-word;
 }
 
 body.light-mode .markdown-content code {
   background-color: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.08);
 }
 
 .markdown-content pre {

@@ -317,19 +317,31 @@ export default function MessageItem({ message }) {
           overflow-wrap: anywhere;
         }
         .user-bubble {
-          background-color: var(--user-bubble);
-          color: var(--user-bubble-text);
-          border-bottom-right-radius: 2px;
-          box-shadow: 0 4px 10px rgba(37, 99, 235, 0.2);
+          background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+          color: #ffffff;
+          border-radius: 18px 18px 4px 18px;
+          box-shadow: 0 4px 16px rgba(79, 70, 229, 0.25);
+          border: 1px solid rgba(255, 255, 255, 0.1);
         }
         body.light-mode .user-bubble {
-          box-shadow: 0 4px 10px rgba(124, 58, 237, 0.2);
+          background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+          color: #ffffff;
+          box-shadow: 0 4px 14px rgba(99, 102, 241, 0.2);
+          border: 1px solid rgba(255, 255, 255, 0.2);
         }
         .ai-bubble {
-          background-color: var(--ai-bubble);
-          border-bottom-left-radius: 2px;
-          border-color: var(--border-color);
+          background: rgba(15, 23, 42, 0.65);
+          border-radius: 18px 18px 18px 4px;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
           width: 100%;
+        }
+        body.light-mode .ai-bubble {
+          background: rgba(255, 255, 255, 0.85);
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
         }
         
         .user-text {

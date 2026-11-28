@@ -13,44 +13,52 @@ const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const CHAT_SUGGESTIONS = [
   {
     icon: <Code size={16} className="suggest-icon code" />,
-    text: "Write a React component with Tailwind",
-    prompt: "Write a modern, accessible React component with Tailwind CSS styling."
+    title: "Full-Stack Code",
+    text: "Write an accessible React component with Tailwind",
+    prompt: "Write a modern, accessible React component with Tailwind CSS styling and clean state management."
   },
   {
     icon: <Sparkles size={16} className="suggest-icon sparkle" />,
-    text: "Explain a complex concept simply",
-    prompt: "Explain how neural networks and transformers work using simple analogies."
+    title: "Deep Tech",
+    text: "Explain transformers & attention mechanisms simply",
+    prompt: "Explain how neural networks, transformers, and self-attention mechanisms work using intuitive real-world analogies."
+  },
+  {
+    icon: <GraduationCap size={16} className="suggest-icon table" />,
+    title: "Exam & Revision",
+    text: "OS Deadlock Avoidance & Banker's Algorithm",
+    prompt: "Operating Systems: Explain Deadlock Prevention, Avoidance, and Banker's Algorithm with detailed ASCII diagram."
   },
   {
     icon: <MessageSquare size={16} className="suggest-icon message" />,
-    text: "Brainstorm creative ideas",
-    prompt: "Give me 5 creative ideas for an innovative mobile application using generative AI."
-  },
-  {
-    icon: <FileText size={16} className="suggest-icon table" />,
-    text: "Draft a professional outline",
-    prompt: "Help me structure a comprehensive project proposal. Provide a clear outline and key sections."
+    title: "AI Innovation",
+    text: "Brainstorm 5 innovative generative AI applications",
+    prompt: "Give me 5 creative, practical ideas for generative AI applications with clear architecture and monetization strategies."
   }
 ];
 
 const STUDY_SUGGESTIONS = [
   {
     icon: <FileText size={16} className="suggest-icon sparkle" />,
+    title: "Part-A Prep",
     text: "Computer Networks: TCP vs UDP (2-Marks)",
     prompt: "Computer Networks Unit 3: Differentiate between TCP and UDP protocols with comparison table."
   },
   {
     icon: <BookOpen size={16} className="suggest-icon code" />,
+    title: "Part-B Prep",
     text: "OS: Deadlock & Banker's Algorithm (16-Marks)",
     prompt: "Operating Systems: Explain Deadlock Prevention, Avoidance, and Banker's Algorithm with detailed diagram."
   },
   {
     icon: <Layers size={16} className="suggest-icon table" />,
+    title: "Quick Revision",
     text: "DBMS: Normalization 1NF to BCNF (Revision)",
     prompt: "Database Management Systems: Quick revision cheat sheet on Functional Dependency, 1NF, 2NF, 3NF, and BCNF."
   },
   {
     icon: <Zap size={16} className="suggest-icon message" />,
+    title: "Tanglish Explain",
     text: "Compiler Design: Lexical Analysis (Tanglish)",
     prompt: "Compiler Design: Explain Lexical Analysis phase, tokens, and lexemes in friendly beginner Tanglish."
   }
@@ -441,26 +449,6 @@ export default function ChatArea({
         </div>
 
         <div className="header-right">
-          <div className="model-selector-wrapper">
-            <select
-              value={activeModel || inputModel || "gemini"}
-              onChange={(e) => {
-                const val = e.target.value;
-                onChangeModel?.(val);
-                if (val === "groq" || val === "hf" || val === "gemini") {
-                  setInputModel(val === "hf" ? "groq" : val);
-                }
-              }}
-              className="model-dropdown-select glass-panel"
-              title="Select AI Model"
-              disabled={isLoading}
-            >
-              <option value="gemini">Gemini (Default)</option>
-              <option value="groq">Groq (Llama 3.3 70B)</option>
-              <option value="openai">OpenAI GPT-4o-mini</option>
-              <option value="claude">Claude 3.5 Sonnet</option>
-            </select>
-          </div>
           <button
             className="settings-trigger-btn"
             onClick={onOpenSettings}
@@ -569,6 +557,7 @@ export default function ChatArea({
                 >
                   <div className="suggestion-header">
                     {sug.icon}
+                    {sug.title && <span className="suggestion-title-tag">{sug.title}</span>}
                   </div>
                   <p className="suggestion-text">{sug.text}</p>
                 </div>
@@ -1117,25 +1106,27 @@ export default function ChatArea({
 
         .welcome-glow {
           position: absolute;
-          width: 280px;
-          height: 280px;
-          background: radial-gradient(circle, var(--primary-glow) 0%, transparent 70%);
+          width: 320px;
+          height: 320px;
+          background: radial-gradient(circle, rgba(139, 92, 246, 0.3) 0%, rgba(59, 130, 246, 0.12) 45%, transparent 70%);
           top: -40px;
           z-index: -1;
           pointer-events: none;
+          filter: blur(25px);
         }
 
         .welcome-logo {
-          width: 64px;
-          height: 64px;
-          border-radius: 20px;
-          background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(59, 130, 246, 0.2));
-          border: 1px solid var(--border-color);
+          width: 68px;
+          height: 68px;
+          border-radius: 22px;
+          background: linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(59, 130, 246, 0.25));
+          border: 1px solid rgba(255, 255, 255, 0.12);
           display: flex;
           align-items: center;
           justify-content: center;
           margin-bottom: 1.25rem;
-          box-shadow: 0 10px 30px rgba(139, 92, 246, 0.2);
+          box-shadow: 0 12px 36px rgba(139, 92, 246, 0.25);
+          backdrop-filter: blur(12px);
         }
 
         .logo-ai {
@@ -1144,11 +1135,11 @@ export default function ChatArea({
 
         .welcome-title {
           font-family: var(--font-display);
-          font-size: 2.2rem;
+          font-size: 2.3rem;
           font-weight: 700;
-          letter-spacing: -0.02em;
-          margin-bottom: 0.5rem;
-          background: linear-gradient(to right, var(--text-main), var(--text-muted));
+          letter-spacing: -0.03em;
+          margin-bottom: 0.6rem;
+          background: linear-gradient(135deg, #ffffff 0%, #e0e7ff 45%, #c084fc 80%, #a855f7 100%);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
         }
@@ -1157,53 +1148,68 @@ export default function ChatArea({
           color: var(--text-muted);
           font-size: 1rem;
           line-height: 1.6;
-          margin-bottom: 2.5rem;
-          max-width: 480px;
+          margin-bottom: 2.25rem;
+          max-width: 500px;
         }
 
         .suggestions-grid {
           display: grid;
-          grid-template-columns: repeat(2, 1fr);
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 12px;
           width: 100%;
           box-sizing: border-box;
         }
+        @media (max-width: 640px) {
+          .suggestions-grid {
+            grid-template-columns: 1fr;
+          }
+        }
 
         .suggestion-card {
-          padding: 1rem;
-          border-radius: 14px;
+          padding: 1.1rem;
+          border-radius: 16px;
           cursor: pointer;
-          transition: all 0.2s ease;
+          transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
           display: flex;
           flex-direction: column;
           gap: 8px;
           text-align: left;
-          background-color: var(--bg-surface);
-          border: 1px solid var(--border-color);
+          background: rgba(15, 23, 42, 0.55);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          backdrop-filter: blur(14px);
         }
         .suggestion-card:hover {
-          background-color: var(--bg-surface-hover);
-          border-color: var(--primary);
+          background: rgba(30, 41, 59, 0.75);
+          border-color: rgba(139, 92, 246, 0.5);
           transform: translateY(-2px);
-          box-shadow: var(--shadow-glow);
+          box-shadow: 0 8px 24px -4px rgba(139, 92, 246, 0.2);
         }
 
         .suggestion-header {
           display: flex;
           align-items: center;
+          gap: 8px;
           color: var(--text-muted);
         }
 
-        .suggest-icon.sparkle { color: #8b5cf6; }
-        .suggest-icon.code { color: #3b82f6; }
-        .suggest-icon.table { color: #10b981; }
-        .suggest-icon.message { color: #ec4899; }
+        .suggestion-title-tag {
+          font-size: 0.72rem;
+          font-weight: 600;
+          letter-spacing: 0.03em;
+          color: var(--text-muted);
+          text-transform: uppercase;
+        }
+
+        .suggest-icon.sparkle { color: #a855f7; }
+        .suggest-icon.code { color: #38bdf8; }
+        .suggest-icon.table { color: #34d399; }
+        .suggest-icon.message { color: #f472b6; }
 
         .suggestion-text {
-          font-size: 0.85rem;
+          font-size: 0.88rem;
           font-weight: 500;
           color: var(--text-main);
-          line-height: 1.4;
+          line-height: 1.45;
         }
 
         .message-list {
@@ -1441,17 +1447,19 @@ export default function ChatArea({
           display: flex;
           align-items: flex-end;
           gap: 8px;
-          padding: 8px 12px;
-          border-radius: 18px;
-          background-color: var(--bg-surface);
-          border: 1px solid var(--border-color);
-          transition: all 0.2s ease;
+          padding: 10px 14px;
+          border-radius: 20px;
+          background: rgba(15, 23, 42, 0.7);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(16px);
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+          transition: all 0.25s ease;
           width: 100%;
           box-sizing: border-box;
         }
         .input-box-wrapper:focus-within {
-          border-color: var(--primary);
-          box-shadow: var(--shadow-glow);
+          border-color: rgba(139, 92, 246, 0.65);
+          box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15), 0 8px 24px rgba(0, 0, 0, 0.3);
         }
         
         .paperclip-btn {
